@@ -1,0 +1,24 @@
+# Environment variables & secrets
+.env
+config/credentials.json
+config/token.json
+
+# Database & logs
+database/*.db
+database/*.db-journal
+logs/*.log
+
+# Python cache & virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+.pytest_cache/
+
+# IDE & OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

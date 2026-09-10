@@ -1,0 +1,27 @@
+.tab-active {
+    border-color: #6366f1;
+    color: #818cf8;
+}
+.tab-inactive {
+    border-color: transparent;
+    color: #94a3b8;
+}
+.tab-inactive:hover {
+    color: #cbd5e1;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}

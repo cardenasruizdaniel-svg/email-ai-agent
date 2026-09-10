@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  email-agent:
+    build: .
+    container_name: email_ai_agent
+    ports:
+      - "8005:8005"
+    environment:
+      - OPERATIONAL_MODE=automatic
+      - POLL_INTERVAL_MINUTES=2
+      - AI_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - EMAIL_PROVIDER=mock
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: always
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+
+volumes:
+  ollama_data:
