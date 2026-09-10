@@ -119,6 +119,10 @@
                 <i class="fa-solid fa-list-check"></i>
                 <span>Registro de Actividad</span>
             </button>
+            <button id="tab-btn-config" onclick="switchTab('config')" class="tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2">
+                <i class="fa-solid fa-gear text-indigo-400"></i>
+                <span class="text-indigo-300 font-bold">Configuración del Sistema</span>
+            </button>
         </div>
 
         <!-- TAB CONTENT 1: ALL EMAILS -->
@@ -234,6 +238,140 @@
                 </div>
                 <div class="p-4 max-h-[600px] overflow-y-auto space-y-2 font-mono text-xs" id="logs-container">
                     <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT 6: DYNAMIC SYSTEM CONFIGURATION -->
+        <div id="tab-config" class="tab-content hidden">
+            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-6 shadow-xl space-y-6">
+                <div class="border-b border-slate-700 pb-4 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-sliders text-indigo-400"></i>
+                            <span>Configuración Dinámica de Correo e Inteligencia Artificial</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">Modifica en tiempo real cualquier cuenta de correo, servidor IMAP/SMTP, clave de IA o modo de operación sin reiniciar.</p>
+                    </div>
+                    <button onclick="saveFullConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow-md flex items-center space-x-2 transition-all">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Guardar Cambios en Vivo</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+
+                    <!-- CORREO ELECTRÓNICO & SERVIDOR -->
+                    <div class="bg-slate-900/60 p-5 rounded-xl border border-slate-700 space-y-4">
+                        <h3 class="font-bold text-indigo-400 text-sm flex items-center space-x-2">
+                            <i class="fa-solid fa-envelope-open-text"></i>
+                            <span>1. Cuenta de Correo & Servidor (IMAP/SMTP)</span>
+                        </h3>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Proveedor de Correo (Preset Rápido)</label>
+                            <select id="cfg-preset" onchange="applyEmailPreset()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500">
+                                <option value="custom">Personalizado (Manual)</option>
+                                <option value="gmail">Gmail (imap.gmail.com / smtp.gmail.com)</option>
+                                <option value="office365">Outlook / Office 365 / Sura (outlook.office365.com)</option>
+                                <option value="yahoo">Yahoo Mail (imap.mail.yahoo.com)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Correo Electrónico (IMAP User)</label>
+                            <input type="email" id="cfg-imap-user" placeholder="ejemplo@empresa.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Contraseña o Contraseña de Aplicación</label>
+                            <input type="password" id="cfg-imap-password" placeholder="Contraseña de 16 caracteres de Google u Office365" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-slate-400 mb-1">Servidor IMAP Entrante</label>
+                                <input type="text" id="cfg-imap-server" placeholder="imap.gmail.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">Puerto IMAP</label>
+                                <input type="number" id="cfg-imap-port" value="993" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-slate-400 mb-1">Servidor SMTP Saliente</label>
+                                <input type="text" id="cfg-smtp-server" placeholder="smtp.gmail.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">Puerto SMTP</label>
+                                <input type="number" id="cfg-smtp-port" value="587" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INTELIGENCIA ARTIFICIAL & MODO -->
+                    <div class="bg-slate-900/60 p-5 rounded-xl border border-slate-700 space-y-4">
+                        <h3 class="font-bold text-indigo-400 text-sm flex items-center space-x-2">
+                            <i class="fa-solid fa-brain"></i>
+                            <span>2. Motor de Inteligencia Artificial & Modo</span>
+                        </h3>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Proveedor de Inteligencia Artificial</label>
+                            <select id="cfg-ai-provider" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500">
+                                <option value="gemini">Google Gemini API Gratuita ($0 - 15 RPM)</option>
+                                <option value="heuristic">Motor Heurístico Autónomo ($0 - Cero claves)</option>
+                                <option value="ollama">Ollama Local (Servidor local http://localhost:11434)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Google Gemini API Key (Gratis en AI Studio)</label>
+                            <input type="text" id="cfg-gemini-key" placeholder="AIzaSy..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500">
+                            <p class="text-[11px] text-slate-400 mt-1">Obtén tu clave gratuita en <a href="https://aistudio.google.com" target="_blank" class="text-indigo-400 underline">aistudio.google.com</a></p>
+                        </div>
+
+                        <hr class="border-slate-700/60 my-2">
+
+                        <h3 class="font-bold text-indigo-400 text-sm flex items-center space-x-2">
+                            <i class="fa-solid fa-building"></i>
+                            <span>3. Identidad Institucional & Modo de Operación</span>
+                        </h3>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-slate-400 mb-1">Modo Operativo</label>
+                                <select id="cfg-op-mode" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                                    <option value="automatic">⚡ Automático (Responde correos seguros)</option>
+                                    <option value="supervised">👁️ Supervisado (Requiere aprobación humana)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">Nombre de la Empresa</label>
+                                <input type="text" id="cfg-company-name" placeholder="Sura" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1">Nombre del Asistente Virtual</label>
+                            <input type="text" id="cfg-agent-name" placeholder="Asistente Virtual IA" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1">Firma para Correos Salientes</label>
+                            <textarea id="cfg-signature" rows="2" placeholder="Atentamente,\nGestión Automática - Sura" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-sans"></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-700">
+                    <button onclick="saveFullConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 transition-all">
+                        <i class="fa-solid fa-floppy-disk text-sm"></i>
+                        <span>Guardar Configuración e Iniciar Sincronización</span>
+                    </button>
                 </div>
             </div>
         </div>

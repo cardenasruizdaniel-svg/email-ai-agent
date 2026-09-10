@@ -378,6 +378,53 @@ async def set_mode(payload: Dict[str, Any] = Body(...)):
     logger.info(f"[Config] Operational mode updated to: {new_mode}")
     return {"status": "success", "mode": settings.OPERATIONAL_MODE}
 
+@app.get("/api/config/full")
+async def get_full_config():
+    """Returns complete dynamic system configuration."""
+    return {
+        "email_provider": settings.EMAIL_PROVIDER,
+        "imap_user": settings.IMAP_USER,
+        "imap_password": settings.IMAP_PASSWORD,
+        "imap_server": settings.IMAP_SERVER,
+        "imap_port": settings.IMAP_PORT,
+        "smtp_server": settings.SMTP_SERVER,
+        "smtp_port": settings.SMTP_PORT,
+        "ai_provider": settings.AI_PROVIDER,
+        "gemini_api_key": settings.GEMINI_API_KEY,
+        "ollama_base_url": settings.OLLAMA_BASE_URL,
+        "ollama_model": settings.OLLAMA_MODEL,
+        "operational_mode": settings.OPERATIONAL_MODE,
+        "poll_interval_minutes": settings.POLL_INTERVAL_MINUTES,
+        "company_name": settings.COMPANY_NAME,
+        "agent_name": settings.AGENT_NAME,
+        "agent_role": settings.AGENT_ROLE,
+        "reply_signature": settings.REPLY_SIGNATURE
+    }
+
+@app.post("/api/config/full")
+async def update_full_config(payload: Dict[str, Any] = Body(...)):
+    """Dynamically updates system configuration in real-time."""
+    for key, val in payload.items():
+        attr = key.upper()
+        if hasattr(settings, attr) and val is not None:
+            setattr(settings, attr, val)
+
+    logger.info(f"[Config] Dynamic system configuration updated for email: {settings.IMAP_USER}")
+    
+    # Save to .env if possible
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    try:
+        lines = []
+        for key in settings.model_fields.keys():
+            val = getattr(settings, key)
+            lines.append(f"{key}={val}\n")
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except Exception as e:
+        logger.warning(f"[Config] Could not write to .env file: {e}")
+
+    return {"status": "success", "message": "Configuración actualizada e implementada en tiempo real."}
+
 @app.post("/api/trigger-sync")
 async def trigger_sync():
     """Triggers an immediate polling and execution cycle."""

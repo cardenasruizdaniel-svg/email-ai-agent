@@ -352,6 +352,10 @@ function switchTab(tabName) {
         btn.className = "tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2";
     });
     document.getElementById(`tab-btn-${tabName}`).className = "tab-active py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2";
+
+    if (tabName === 'config') {
+        loadFullConfig();
+    }
 }
 
 function filterEmails() {
@@ -363,4 +367,86 @@ function filterEmails() {
         e.snippet.toLowerCase().includes(q)
     );
     renderEmailTable(filtered);
+}
+
+async function loadFullConfig() {
+    try {
+        const res = await fetch("/api/config/full");
+        const cfg = await res.json();
+
+        document.getElementById("cfg-imap-user").value = cfg.imap_user || "";
+        document.getElementById("cfg-imap-password").value = cfg.imap_password || "";
+        document.getElementById("cfg-imap-server").value = cfg.imap_server || "imap.gmail.com";
+        document.getElementById("cfg-imap-port").value = cfg.imap_port || 993;
+        document.getElementById("cfg-smtp-server").value = cfg.smtp_server || "smtp.gmail.com";
+        document.getElementById("cfg-smtp-port").value = cfg.smtp_port || 587;
+        document.getElementById("cfg-ai-provider").value = cfg.ai_provider || "gemini";
+        document.getElementById("cfg-gemini-key").value = cfg.gemini_api_key || "";
+        document.getElementById("cfg-op-mode").value = cfg.operational_mode || "automatic";
+        document.getElementById("cfg-company-name").value = cfg.company_name || "";
+        document.getElementById("cfg-agent-name").value = cfg.agent_name || "Asistente Virtual IA";
+        document.getElementById("cfg-signature").value = cfg.reply_signature || "";
+    } catch (e) {
+        console.error("Error loading config:", e);
+    }
+}
+
+function applyEmailPreset() {
+    const preset = document.getElementById("cfg-preset").value;
+    if (preset === "gmail") {
+        document.getElementById("cfg-imap-server").value = "imap.gmail.com";
+        document.getElementById("cfg-imap-port").value = 993;
+        document.getElementById("cfg-smtp-server").value = "smtp.gmail.com";
+        document.getElementById("cfg-smtp-port").value = 587;
+    } else if (preset === "office365") {
+        document.getElementById("cfg-imap-server").value = "outlook.office365.com";
+        document.getElementById("cfg-imap-port").value = 993;
+        document.getElementById("cfg-smtp-server").value = "smtp.office365.com";
+        document.getElementById("cfg-smtp-port").value = 587;
+    } else if (preset === "yahoo") {
+        document.getElementById("cfg-imap-server").value = "imap.mail.yahoo.com";
+        document.getElementById("cfg-imap-port").value = 993;
+        document.getElementById("cfg-smtp-server").value = "smtp.mail.yahoo.com";
+        document.getElementById("cfg-smtp-port").value = 587;
+    }
+}
+
+async function saveFullConfig() {
+    const payload = {
+        email_provider: "imap",
+        imap_user: document.getElementById("cfg-imap-user").value.trim(),
+        imap_password: document.getElementById("cfg-imap-password").value.trim(),
+        imap_server: document.getElementById("cfg-imap-server").value.trim(),
+        imap_port: parseInt(document.getElementById("cfg-imap-port").value) || 993,
+        smtp_server: document.getElementById("cfg-smtp-server").value.trim(),
+        smtp_port: parseInt(document.getElementById("cfg-smtp-port").value) || 587,
+        ai_provider: document.getElementById("cfg-ai-provider").value,
+        gemini_api_key: document.getElementById("cfg-gemini-key").value.trim(),
+        operational_mode: document.getElementById("cfg-op-mode").value,
+        company_name: document.getElementById("cfg-company-name").value.trim(),
+        agent_name: document.getElementById("cfg-agent-name").value.trim(),
+        reply_signature: document.getElementById("cfg-signature").value.trim()
+    };
+
+    if (!payload.imap_user || !payload.imap_password) {
+        alert("Por favor ingresa el correo electrónico y la contraseña.");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/config/full", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert("✅ Configuración guardada e implementada correctamente en tiempo real.");
+            triggerSync();
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Error al guardar la configuración.");
+    }
 }
