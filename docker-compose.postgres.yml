@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  email-agent:
+    build: .
+    container_name: email_ai_agent
+    ports:
+      - "8005:8005"
+    environment:
+      - OPERATIONAL_MODE=automatic
+      - POLL_INTERVAL_MINUTES=2
+      - AI_PROVIDER=heuristic
+      - EMAIL_PROVIDER=mock
+      - DATABASE_URL=postgresql+asyncpg://email_user:EmailAgentPass2026!@postgres_db:5432/email_agent_db
+    depends_on:
+      - postgres_db
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: always
+
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: email_agent_postgres
+    environment:
+      - POSTGRES_DB=email_agent_db
+      - POSTGRES_USER=email_user
+      - POSTGRES_PASSWORD=EmailAgentPass2026!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:

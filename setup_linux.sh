@@ -1,26 +1,38 @@
 #!/bin/bash
 # ==============================================================================
-# Script de Instalación Automatizada para Linux (Ubuntu/Debian) - Email AI Agent
+# Script de Instalación Automatizada Universal para Linux - Email AI Agent
 # ==============================================================================
 
 set -e
 
 echo "🚀 Iniciando instalación de Email AI Agent en Linux..."
 
-# 1. Actualizar repositorios e instalar paquetes del sistema
-echo "📦 Instalando dependencias del sistema y PostgreSQL..."
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip postgresql postgresql-contrib git
+# Detectar gestor de paquetes
+if command -v apt &> /dev/null; then
+    echo "📦 Detectado sistema Ubuntu/Debian (apt)..."
+    sudo apt update
+    sudo apt install -y python3 python3-venv python3-pip postgresql postgresql-contrib git curl
+elif command -v dnf &> /dev/null; then
+    echo "📦 Detectado sistema RHEL/CentOS/Fedora (dnf)..."
+    sudo dnf install -y python3 python3-pip postgresql-server postgresql-contrib git curl
+    sudo postgresql-setup --initdb 2>/dev/null || true
+    sudo systemctl enable --now postgresql
+elif command -v yum &> /dev/null; then
+    echo "📦 Detectado sistema CentOS/RHEL (yum)..."
+    sudo yum install -y python3 python3-pip postgresql-server postgresql-contrib git curl
+    sudo postgresql-setup initdb 2>/dev/null || true
+    sudo systemctl enable --now postgresql
+fi
 
 # 2. Configurar Base de Datos PostgreSQL
 DB_NAME="email_agent_db"
 DB_USER="email_user"
 DB_PASS="EmailAgentPass2026!"
 
-echo "🐘 Configurando base de datos PostgreSQL: $DB_NAME..."
+echo "🐘 Configurando base de datos PostgreSQL ($DB_NAME)..."
 sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;" 2>/dev/null || echo "Base de datos ya existe."
 sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || echo "Usuario ya existe."
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
 sudo -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;" 2>/dev/null || true
 
 # 3. Crear entorno virtual e instalar requerimientos
@@ -73,10 +85,14 @@ sudo systemctl daemon-reload
 sudo systemctl enable email-agent
 sudo systemctl restart email-agent
 
+# Detectar IP local
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
 echo "=================================================================="
-echo "✅ ¡Instalación en Linux completada exitosamente!"
+echo "✅ ¡INSTALACIÓN EN LINUX COMPLETADA EXITOSAMENTE!"
 echo "------------------------------------------------------------------"
-echo "🌐 Dashboard disponible en: http://localhost:8005 (o IP de tu servidor)"
-echo "📊 Ver estado del servicio: sudo systemctl status email-agent"
-echo "📜 Ver logs en tiempo real: sudo journalctl -u email-agent -f"
+echo "🌐 Dashboard Web activo en: http://$SERVER_IP:8005"
+echo "📊 Estado del servicio:     sudo systemctl status email-agent"
+echo "🔄 Reiniciar servicio:     sudo systemctl restart email-agent"
+echo "📜 Ver logs en vivo:        sudo journalctl -u email-agent -f"
 echo "=================================================================="
