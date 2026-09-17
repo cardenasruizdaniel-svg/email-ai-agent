@@ -1,0 +1,15 @@
+[Unit]
+Description=Servicio Agente Autónomo de Gestión de Correos IA
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/email-ai-agent
+ExecStart=/opt/email-ai-agent/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8005
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/email-ai-agent/.env
+
+[Install]
+WantedBy=multi-user.target

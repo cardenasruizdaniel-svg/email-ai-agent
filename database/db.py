@@ -3,13 +3,21 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from config.settings import settings
 from database.models import Base
 
-# Ensure directory exists for database file
-if "sqlite" in settings.DATABASE_URL:
-    db_path = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "")
-    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+db_url = settings.DATABASE_URL
+
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif db_url.startswith("postgresql://") and not ("+asyncpg" in db_url or "+psycopg" in db_url):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+# Ensure directory exists for SQLite database file if applicable
+if "sqlite" in db_url:
+    db_path = db_url.replace("sqlite+aiosqlite:///", "")
+    if db_path != ":memory:":
+        os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
 
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     echo=False,
     future=True
 )
