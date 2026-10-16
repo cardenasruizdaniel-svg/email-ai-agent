@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select, func, update
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import settings
@@ -297,14 +298,14 @@ class Repository:
     async def get_case_by_thread_or_code(db: AsyncSession, thread_id: str = "", case_code: str = "") -> Optional[CaseTicket]:
         """Finds an existing case by thread ID or case code."""
         if case_code:
-            stmt = select(CaseTicket).where(CaseTicket.case_code == case_code)
+            stmt = select(CaseTicket).options(selectinload(CaseTicket.workflow_rel)).where(CaseTicket.case_code == case_code)
             res = await db.execute(stmt)
             case = res.scalar_one_or_none()
             if case:
                 return case
 
         if thread_id:
-            stmt = select(CaseTicket).where(CaseTicket.thread_id == thread_id)
+            stmt = select(CaseTicket).options(selectinload(CaseTicket.workflow_rel)).where(CaseTicket.thread_id == thread_id)
             res = await db.execute(stmt)
             return res.scalar_one_or_none()
         return None

@@ -176,7 +176,11 @@ class WorkflowEngine:
         Advances the case to the next user in the chain.
         If last step, marks as COMPLETADO and returns final dossier to the Principal User.
         """
-        workflow = case.workflow_rel
+        workflow = None
+        if case.workflow_id:
+            from sqlalchemy import select
+            stmt_wf = select(WorkflowDefinition).where(WorkflowDefinition.id == case.workflow_id)
+            workflow = (await db.execute(stmt_wf)).scalar_one_or_none()
         steps = json.loads(workflow.steps or "[]") if workflow else []
 
         current_idx = -1

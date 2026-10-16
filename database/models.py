@@ -120,7 +120,7 @@ class WorkflowDefinition(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    cases = relationship("CaseTicket", back_populates="workflow_rel")
+    cases = relationship("CaseTicket", back_populates="workflow_rel", lazy="selectin")
 
 class CaseTicket(Base):
     __tablename__ = "case_tickets"
@@ -154,8 +154,8 @@ class CaseTicket(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
-    workflow_rel = relationship("WorkflowDefinition", back_populates="cases")
-    history_logs = relationship("CaseHistoryLog", back_populates="case_rel", cascade="all, delete-orphan")
+    workflow_rel = relationship("WorkflowDefinition", back_populates="cases", lazy="selectin")
+    history_logs = relationship("CaseHistoryLog", back_populates="case_rel", cascade="all, delete-orphan", lazy="selectin")
 
 class CaseHistoryLog(Base):
     __tablename__ = "case_history_logs"
@@ -172,4 +172,4 @@ class CaseHistoryLog(Base):
     duration_hours = Column(Float, default=0.0)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
-    case_rel = relationship("CaseTicket", back_populates="history_logs")
+    case_rel = relationship("CaseTicket", back_populates="history_logs", lazy="selectin")
