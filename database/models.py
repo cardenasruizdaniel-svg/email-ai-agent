@@ -105,3 +105,71 @@ class UserCorrection(Base):
     corrected_tags = Column(Text, default="[]")
     notes = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class WorkflowDefinition(Base):
+    __tablename__ = "workflow_definitions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text, default="")
+    trigger_keywords = Column(Text, default="[]") # JSON list of strings (e.g. ["ingreso", "paciente", "cama"])
+    trigger_category = Column(String, default="SOLICITUD")
+    target_folder = Column(String, default="General") # e.g. "Ingreso Pacientes", "Autorizaciones"
+    supervisor_email = Column(String, default="") # Email to notify on problems & completion
+    steps = Column(Text, default="[]") # JSON list of dicts: [{"step_number": 1, "name": "Admisiones", "assigned_email": "adm@clinica.com", "action_required": "Verificar"}, ...]
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    cases = relationship("CaseTicket", back_populates="workflow_rel")
+
+class CaseTicket(Base):
+    __tablename__ = "case_tickets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    case_code = Column(String, unique=True, index=True, nullable=False) # e.g. "CASO-2026-0001"
+    workflow_id = Column(Integer, ForeignKey("workflow_definitions.id"), nullable=True)
+    thread_id = Column(String, index=True, nullable=False)
+    initial_email_id = Column(String, ForeignKey("email_messages.id"), nullable=True)
+    patient_name = Column(String, default="")
+    patient_id_doc = Column(String, default="")
+    subject = Column(Text, default="")
+    summary = Column(Text, default="")
+    target_folder = Column(String, default="General")
+    
+    # State in workflow
+    current_step_number = Column(Integer, default=1)
+    current_step_name = Column(String, default="")
+    current_assigned_email = Column(String, default="", index=True)
+    supervisor_email = Column(String, default="")
+    status = Column(String, default="EN_PROCESO", index=True) 
+    # EN_PROCESO, EN_APROBACION, DETENIDO_PROBLEMA, DEVUELTO, COMPLETADO
+    
+    # Metrics
+    total_transitions = Column(Integer, default=1) # Times advanced across steps
+    total_returns = Column(Integer, default=0)     # Times rejected/returned with problems
+    last_problem_reported = Column(Text, default="")
+    bottleneck_reason = Column(Text, default="")   # Categorized reason (e.g. "Falta de documento", "Sin disponibilidad")
+    
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    workflow_rel = relationship("WorkflowDefinition", back_populates="cases")
+    history_logs = relationship("CaseHistoryLog", back_populates="case_rel", cascade="all, delete-orphan")
+
+class CaseHistoryLog(Base):
+    __tablename__ = "case_history_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    case_id = Column(Integer, ForeignKey("case_tickets.id"), nullable=False, index=True)
+    step_number = Column(Integer, default=1)
+    step_name = Column(String, default="")
+    actor_email = Column(String, default="")
+    action = Column(String, nullable=False) 
+    # INICIADO, REENVIADO_ETAPA, GESTION_APROBADA, PROBLEMA_REPORTADO, ALERTA_SUPERVISOR_ENVIADA, COMPLETADO_FINAL
+    comments = Column(Text, default="")
+    problem_details = Column(Text, default="")
+    duration_hours = Column(Float, default=0.0)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    case_rel = relationship("CaseTicket", back_populates="history_logs")

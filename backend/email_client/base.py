@@ -32,6 +32,24 @@ class BaseEmailClient(ABC):
         pass
 
     @abstractmethod
+    async def move_to_folder(self, message_id: str, folder_name: str) -> bool:
+        """Moves or categorizes the email message into a specific folder/label."""
+        pass
+
+    @abstractmethod
+    async def forward_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+        thread_id: Optional[str] = None,
+        original_email_id: Optional[str] = None
+    ) -> bool:
+        """Forwards an email with context and attachments to a user in the chain."""
+        pass
+
+    @abstractmethod
     async def mark_as_read(self, message_id: str) -> bool:
         """Marks the email message as processed/read."""
         pass

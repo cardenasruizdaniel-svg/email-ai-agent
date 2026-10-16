@@ -109,6 +109,7 @@ class HeuristicProvider(BaseLLMProvider):
     """
     async def analyze_email(self, sender_name: str, sender_email: str, subject: str, body: str, attachments_summary: str = "") -> Dict[str, Any]:
         text_full = f"{subject} {body} {attachments_summary}".lower()
+        full_content = f"{subject}\n{body}\n{attachments_summary}"
 
         # Company inference
         company = ""
@@ -118,12 +119,133 @@ class HeuristicProvider(BaseLLMProvider):
             if domain_name not in ["gmail", "yahoo", "hotmail", "outlook"]:
                 company = domain_name.replace("-", " ").replace("_", " ").title()
 
-        # Risk Analysis Keywords
+        # Patient Extraction
+        patient_name = ""
+        patient_id_doc = ""
+        p_match = re.search(r'(?:paciente|usuario|nombre)[:\s]+([A-Za-zÁÉÍÓÚáéíóúñÑ ]+?)(?:[\n,\-–]|con\s+cc|con\s+cédula|identificado|\.|$)', full_content, re.IGNORECASE)
+        if not p_match:
+            p_match = re.search(r'ingreso\s+(?:del\s+)?paciente[:\s]+([A-Za-zÁÉÍÓÚáéíóúñÑ ]+?)(?:[\n,\-–]|con\s+cc|con\s+cédula|identificado|\.|$)', full_content, re.IGNORECASE)
+        if p_match:
+            cand = p_match.group(1).strip()
+            if 2 < len(cand) <= 40 and len(cand.split()) <= 5:
+                patient_name = cand
+
+        doc_match = re.search(r'(?:cc|ti|c\.c\.|documento|cédula|cedula|identificación)[:\s#]*([0-9\.\-]+)', full_content, re.IGNORECASE)
+        if doc_match:
+            patient_id_doc = doc_match.group(1).strip()
+        elif "cc " in full_content.lower():
+            doc_alt = re.search(r'\bcc\s+([0-9]+)\b', full_content, re.IGNORECASE)
+            if doc_alt:
+                patient_id_doc = doc_alt.group(1).strip()
+
+        # Folder and Workflow Determination
+        target_folder = "General"
+        workflow_topic = ""
+        if "ingreso" in text_full and ("paciente" in text_full or "cama" in text_full or "hospital" in text_full or "urgencia" in text_full or "clínica" in text_full or "clinica" in text_full):
+            target_folder = "Ingreso Pacientes"
+            workflow_topic = "Ingreso de Pacientes"
+        elif "autoriza" in text_full or "orden médica" in text_full or "orden medica" in text_full or "eps" in text_full:
+            target_folder = "Autorizaciones"
+            workflow_topic = "Autorizaciones Médicas"
+        elif "factura" in text_full or "cotización" in text_full or "cotizacion" in text_full:
+            target_folder = "Facturación"
+            workflow_topic = "Facturación"
+
+        # Workflow Action and Problem/Approval Detection
+        workflow_action = "NINGUNA"
+        problem_reason = ""
+        bottleneck_category = ""
+        
+        is_case_reply = "[CASO-" in subject.upper() or "[CASO-" in body.upper()
+        
+        problem_indicators = [
+            ("rechazo", "Rechazo de solicitud"),
+            ("rechazada", "Solicitud rechazada"),
+            ("no se autoriza", "Falta de autorización EPS"),
+            ("falta", "Falta de documento o información"),
+            ("incompleto", "Documentación incompleta"),
+            ("inconsistente", "Inconsistencia de datos del paciente"),
+            ("inconsistencia", "Inconsistencia de datos del paciente"),
+            ("sin cama", "Sin disponibilidad de camas"),
+            ("sin disponibilidad", "Sin disponibilidad de camas"),
+            ("no hay cama", "Sin disponibilidad de camas"),
+            ("no es posible el ingreso", "Detención en proceso de ingreso"),
+            ("detenido", "Proceso detenido"),
+            ("no procede", "No procede solicitud")
+        ]
+
+        found_problem = False
+        for trigger, cat in problem_indicators:
+            if trigger in text_full:
+                found_problem = True
+                bottleneck_category = cat
+                problem_reason = f"Reporte de novedad: {cat}. Detectado: '{trigger}'"
+                break
+
+        if is_case_reply:
+            if found_problem:
+                workflow_action = "PROBLEMA_REPORTADO"
+            else:
+                workflow_action = "APROBADO_AVANZAR"
+        elif workflow_topic:
+            workflow_action = "NUEVO_CASO"
+
+        # Patient Admission Workflow Quick Route
+        if workflow_topic == "Ingreso de Pacientes" and not is_case_reply:
+            return {
+                "sender_name": sender_name,
+                "company": company or "Centro Médico / EPS",
+                "intent_summary": f"Solicitud de ingreso hospitalario para paciente: {patient_name or 'Paciente no especificado'}",
+                "category": "SOLICITUD",
+                "subcategories": ["Ingreso hospitalario", "Admisiones"],
+                "tags": ["Ingreso de Pacientes", "Solicitud clínica", "Workflow Activo"],
+                "priority": "ALTA",
+                "confidence": 98.0,
+                "risk_level": "MEDIO",
+                "risk_reasons": ["Proceso clínico que requiere diligencia secuencial y asignación de cama"],
+                "requires_human_review": True,
+                "can_auto_reply": False,
+                "suggested_reply": "",
+                "target_folder": target_folder,
+                "workflow_topic": workflow_topic,
+                "patient_name": patient_name,
+                "patient_id_doc": patient_id_doc,
+                "workflow_action": workflow_action,
+                "problem_reason": problem_reason,
+                "bottleneck_category": bottleneck_category
+            }
+
+        # Case Response Quick Route
+        if is_case_reply:
+            return {
+                "sender_name": sender_name,
+                "company": company,
+                "intent_summary": f"Respuesta a seguimiento de caso: {subject}",
+                "category": "SOLICITUD",
+                "subcategories": ["Seguimiento de caso"],
+                "tags": ["Seguimiento Caso", "Workflow Activo"],
+                "priority": "ALTA" if workflow_action == "PROBLEMA_REPORTADO" else "MEDIA",
+                "confidence": 97.0,
+                "risk_level": "ALTO" if workflow_action == "PROBLEMA_REPORTADO" else "BAJO",
+                "risk_reasons": [problem_reason] if problem_reason else [],
+                "requires_human_review": True,
+                "can_auto_reply": False,
+                "suggested_reply": "",
+                "target_folder": target_folder,
+                "workflow_topic": workflow_topic,
+                "patient_name": patient_name,
+                "patient_id_doc": patient_id_doc,
+                "workflow_action": workflow_action,
+                "problem_reason": problem_reason,
+                "bottleneck_category": bottleneck_category
+            }
+
+        # Risk Analysis Keywords (Financial / Legal / Critical Failure)
         high_risk_triggers = [
             "contrato", "legal", "demanda", "abogado", "banco", "bancario", "bancarios",
             "transferencia", "cuenta bancaria", "pago de $", "usd", "dólares", "dolares",
             "falla crítica", "falla critica", "pérdida de datos", "perdida de datos",
-            "reclamo grave", "emergencia", "médico", "salud", "clínica"
+            "reclamo grave", "emergencia"
         ]
 
         detected_risk_reasons = []
@@ -149,7 +271,14 @@ class HeuristicProvider(BaseLLMProvider):
                 "risk_reasons": ["Correo identificado como publicidad o spam"],
                 "requires_human_review": False,
                 "can_auto_reply": False,
-                "suggested_reply": ""
+                "suggested_reply": "",
+                "target_folder": target_folder,
+                "workflow_topic": workflow_topic,
+                "patient_name": patient_name,
+                "patient_id_doc": patient_id_doc,
+                "workflow_action": "NINGUNA",
+                "problem_reason": "",
+                "bottleneck_category": ""
             }
 
         # Ambiguous Email Detection

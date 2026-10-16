@@ -43,6 +43,15 @@ class EmailAnalyzer:
         analysis["requires_human_review"] = bool(analysis.get("requires_human_review", False))
         analysis["can_auto_reply"] = bool(analysis.get("can_auto_reply", False))
 
+        # Workflow & Tracking fields
+        analysis["target_folder"] = analysis.get("target_folder") or "General"
+        analysis["workflow_topic"] = analysis.get("workflow_topic") or ""
+        analysis["patient_name"] = analysis.get("patient_name") or ""
+        analysis["patient_id_doc"] = analysis.get("patient_id_doc") or ""
+        analysis["workflow_action"] = analysis.get("workflow_action") or "NINGUNA"
+        analysis["problem_reason"] = analysis.get("problem_reason") or ""
+        analysis["bottleneck_category"] = analysis.get("bottleneck_category") or ""
+
         logger.info(
             f"[EmailAnalyzer] Analysis completed for '{subject}' | Category: {analysis['category']} | "
             f"Priority: {analysis['priority']} | Confidence: {analysis['confidence']}% | Risk: {analysis['risk_level']}"

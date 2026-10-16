@@ -5,7 +5,11 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Sender, EmailMessage, CustomRule, ActivityLog, UserCorrection
+from config.settings import settings
+from .models import (
+    Sender, EmailMessage, CustomRule, ActivityLog, UserCorrection,
+    WorkflowDefinition, CaseTicket, CaseHistoryLog
+)
 
 logger = logging.getLogger(__name__)
 
@@ -190,3 +194,339 @@ class Repository:
             "urgent": total_urgent,
             "with_attachments": total_attach
         }
+
+    @staticmethod
+    async def get_or_create_default_workflows(db: AsyncSession) -> List[WorkflowDefinition]:
+        """Ensures default workflows exist (e.g., Ingreso de Pacientes, Autorizaciones)."""
+        stmt = select(WorkflowDefinition)
+        result = await db.execute(stmt)
+        existing = list(result.scalars().all())
+        if existing:
+            return existing
+
+        default_supervisor = getattr(settings, "SUPERVISOR_EMAIL", "coordinacion@clinica.com")
+        
+        # 1. Ingreso de Pacientes
+        wf_ingreso = WorkflowDefinition(
+            name="Ingreso de Pacientes",
+            description="Flujo secuencial de admisión: Admisiones -> Auditoría Médica -> Asignación de Camas",
+            trigger_keywords=json.dumps(["ingreso", "paciente", "cama", "admision", "admisión", "hospitalizacion", "hospitalización"]),
+            trigger_category="SOLICITUD",
+            target_folder="Ingreso Pacientes",
+            supervisor_email=default_supervisor,
+            steps=json.dumps([
+                {
+                    "step_number": 1,
+                    "name": "Admisiones",
+                    "assigned_email": "admisiones@clinica.com",
+                    "action_required": "Verificar orden de hospitalización y documento del paciente"
+                },
+                {
+                    "step_number": 2,
+                    "name": "Auditoría Médica",
+                    "assigned_email": "auditoria@clinica.com",
+                    "action_required": "Validar pertinencia clínica, cobertura y autorizaciones"
+                },
+                {
+                    "step_number": 3,
+                    "name": "Asignación de Camas",
+                    "assigned_email": "camas@clinica.com",
+                    "action_required": "Asignar pabellón, habitación y cama disponible"
+                }
+            ]),
+            is_active=True
+        )
+
+        # 2. Autorizaciones Médicas
+        wf_autorizaciones = WorkflowDefinition(
+            name="Autorizaciones Médicas",
+            description="Flujo de gestión y radicación de autorizaciones médicas con EPS",
+            trigger_keywords=json.dumps(["autorizacion", "autorización", "orden medica", "orden médica", "eps", "cobertura"]),
+            trigger_category="SOLICITUD",
+            target_folder="Autorizaciones",
+            supervisor_email=default_supervisor,
+            steps=json.dumps([
+                {
+                    "step_number": 1,
+                    "name": "Radicación EPS",
+                    "assigned_email": "radicacion@clinica.com",
+                    "action_required": "Radicar orden ante la EPS y solicitar número de autorización"
+                },
+                {
+                    "step_number": 2,
+                    "name": "Facturación y Convenios",
+                    "assigned_email": "facturacion@clinica.com",
+                    "action_required": "Verificar tarifa contratada y confirmar aval de atención"
+                }
+            ]),
+            is_active=True
+        )
+
+        db.add(wf_ingreso)
+        db.add(wf_autorizaciones)
+        await db.commit()
+        await db.refresh(wf_ingreso)
+        await db.refresh(wf_autorizaciones)
+        return [wf_ingreso, wf_autorizaciones]
+
+    @staticmethod
+    async def match_workflow(db: AsyncSession, topic: str = "", text: str = "") -> Optional[WorkflowDefinition]:
+        """Matches an incoming email to a workflow definition by topic or trigger keywords."""
+        workflows = await Repository.get_or_create_default_workflows(db)
+        topic_lower = topic.strip().lower()
+        text_lower = text.lower()
+
+        # Direct name/topic match
+        for wf in workflows:
+            if not wf.is_active:
+                continue
+            if topic_lower and (topic_lower in wf.name.lower() or wf.name.lower() in topic_lower):
+                return wf
+
+        # Keyword match
+        for wf in workflows:
+            if not wf.is_active:
+                continue
+            keywords = json.loads(wf.trigger_keywords or "[]")
+            if any(kw.lower() in text_lower for kw in keywords):
+                return wf
+
+        return None
+
+    @staticmethod
+    async def get_case_by_thread_or_code(db: AsyncSession, thread_id: str = "", case_code: str = "") -> Optional[CaseTicket]:
+        """Finds an existing case by thread ID or case code."""
+        if case_code:
+            stmt = select(CaseTicket).where(CaseTicket.case_code == case_code)
+            res = await db.execute(stmt)
+            case = res.scalar_one_or_none()
+            if case:
+                return case
+
+        if thread_id:
+            stmt = select(CaseTicket).where(CaseTicket.thread_id == thread_id)
+            res = await db.execute(stmt)
+            return res.scalar_one_or_none()
+        return None
+
+    @staticmethod
+    async def create_case(db: AsyncSession, case_data: Dict[str, Any]) -> CaseTicket:
+        """Creates a new case ticket and logs the initial event."""
+        year = datetime.utcnow().year
+        stmt_count = select(func.count(CaseTicket.id))
+        total_cases = (await db.execute(stmt_count)).scalar() or 0
+        case_code = f"CASO-{year}-{total_cases + 1:04d}"
+
+        case = CaseTicket(
+            case_code=case_code,
+            workflow_id=case_data.get("workflow_id"),
+            thread_id=case_data.get("thread_id", ""),
+            initial_email_id=case_data.get("initial_email_id"),
+            patient_name=case_data.get("patient_name", ""),
+            patient_id_doc=case_data.get("patient_id_doc", ""),
+            subject=case_data.get("subject", ""),
+            summary=case_data.get("summary", ""),
+            target_folder=case_data.get("target_folder", "General"),
+            current_step_number=case_data.get("current_step_number", 1),
+            current_step_name=case_data.get("current_step_name", ""),
+            current_assigned_email=case_data.get("current_assigned_email", ""),
+            supervisor_email=case_data.get("supervisor_email", ""),
+            status="EN_PROCESO",
+            total_transitions=1,
+            total_returns=0
+        )
+        db.add(case)
+        await db.commit()
+        await db.refresh(case)
+
+        # Add initial history log
+        log = CaseHistoryLog(
+            case_id=case.id,
+            step_number=case.current_step_number,
+            step_name=case.current_step_name,
+            actor_email=case.current_assigned_email,
+            action="INICIADO",
+            comments=f"Caso {case.case_code} iniciado y remitido a {case.current_step_name} ({case.current_assigned_email})"
+        )
+        db.add(log)
+        await db.commit()
+        return case
+
+    @staticmethod
+    async def log_case_event(
+        db: AsyncSession,
+        case_id: int,
+        step_number: int,
+        step_name: str,
+        actor_email: str,
+        action: str,
+        comments: str = "",
+        problem_details: str = "",
+        duration_hours: float = 0.0
+    ) -> CaseHistoryLog:
+        """Adds a milestone or status log to a case."""
+        log = CaseHistoryLog(
+            case_id=case_id,
+            step_number=step_number,
+            step_name=step_name,
+            actor_email=actor_email,
+            action=action,
+            comments=comments,
+            problem_details=problem_details,
+            duration_hours=duration_hours,
+            timestamp=datetime.utcnow()
+        )
+        db.add(log)
+        await db.commit()
+        return log
+
+    @staticmethod
+    async def get_cases(
+        db: AsyncSession,
+        status: Optional[str] = None,
+        folder: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Lists cases with metadata and summary of logs."""
+        stmt = select(CaseTicket).order_by(CaseTicket.updated_at.desc())
+        if status:
+            stmt = stmt.where(CaseTicket.status == status)
+        if folder:
+            stmt = stmt.where(CaseTicket.target_folder == folder)
+        stmt = stmt.limit(limit)
+        result = await db.execute(stmt)
+        cases = list(result.scalars().all())
+
+        case_list = []
+        for c in cases:
+            case_list.append({
+                "id": c.id,
+                "case_code": c.case_code,
+                "workflow_id": c.workflow_id,
+                "thread_id": c.thread_id,
+                "patient_name": c.patient_name,
+                "patient_id_doc": c.patient_id_doc,
+                "subject": c.subject,
+                "summary": c.summary,
+                "target_folder": c.target_folder,
+                "current_step_number": c.current_step_number,
+                "current_step_name": c.current_step_name,
+                "current_assigned_email": c.current_assigned_email,
+                "supervisor_email": c.supervisor_email,
+                "status": c.status,
+                "total_transitions": c.total_transitions,
+                "total_returns": c.total_returns,
+                "last_problem_reported": c.last_problem_reported,
+                "bottleneck_reason": c.bottleneck_reason,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+                "completed_at": c.completed_at.isoformat() if c.completed_at else None,
+            })
+        return case_list
+
+    @staticmethod
+    async def get_case_details(db: AsyncSession, case_id: int) -> Optional[Dict[str, Any]]:
+        """Gets full case details including chronological history logs."""
+        stmt = select(CaseTicket).where(CaseTicket.id == case_id)
+        res = await db.execute(stmt)
+        case = res.scalar_one_or_none()
+        if not case:
+            return None
+
+        stmt_logs = select(CaseHistoryLog).where(CaseHistoryLog.case_id == case_id).order_by(CaseHistoryLog.timestamp.asc())
+        logs_res = await db.execute(stmt_logs)
+        logs = list(logs_res.scalars().all())
+
+        return {
+            "id": case.id,
+            "case_code": case.case_code,
+            "workflow_id": case.workflow_id,
+            "thread_id": case.thread_id,
+            "patient_name": case.patient_name,
+            "patient_id_doc": case.patient_id_doc,
+            "subject": case.subject,
+            "summary": case.summary,
+            "target_folder": case.target_folder,
+            "current_step_number": case.current_step_number,
+            "current_step_name": case.current_step_name,
+            "current_assigned_email": case.current_assigned_email,
+            "supervisor_email": case.supervisor_email,
+            "status": case.status,
+            "total_transitions": case.total_transitions,
+            "total_returns": case.total_returns,
+            "last_problem_reported": case.last_problem_reported,
+            "bottleneck_reason": case.bottleneck_reason,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+            "completed_at": case.completed_at.isoformat() if case.completed_at else None,
+            "logs": [
+                {
+                    "id": l.id,
+                    "step_number": l.step_number,
+                    "step_name": l.step_name,
+                    "actor_email": l.actor_email,
+                    "action": l.action,
+                    "comments": l.comments,
+                    "problem_details": l.problem_details,
+                    "duration_hours": l.duration_hours,
+                    "timestamp": l.timestamp.isoformat() if l.timestamp else None
+                }
+                for l in logs
+            ]
+        }
+
+    @staticmethod
+    async def get_bottleneck_report(db: AsyncSession) -> Dict[str, Any]:
+        """Generates comprehensive bottleneck metrics, stoppages, and return statistics."""
+        total_stmt = select(func.count(CaseTicket.id))
+        total_cases = (await db.execute(total_stmt)).scalar() or 0
+
+        stopped_stmt = select(func.count(CaseTicket.id)).where(CaseTicket.status == "DETENIDO_PROBLEMA")
+        stopped_cases = (await db.execute(stopped_stmt)).scalar() or 0
+
+        completed_stmt = select(func.count(CaseTicket.id)).where(CaseTicket.status == "COMPLETADO")
+        completed_cases = (await db.execute(completed_stmt)).scalar() or 0
+
+        returns_stmt = select(func.sum(CaseTicket.total_returns))
+        total_returns = (await db.execute(returns_stmt)).scalar() or 0
+
+        transitions_stmt = select(func.sum(CaseTicket.total_transitions))
+        total_transitions = (await db.execute(transitions_stmt)).scalar() or 0
+
+        group_stmt = select(CaseTicket.bottleneck_reason, func.count(CaseTicket.id))\
+            .where(CaseTicket.bottleneck_reason != "")\
+            .group_by(CaseTicket.bottleneck_reason)
+        group_res = await db.execute(group_stmt)
+        bottlenecks_by_reason = [{"reason": row[0], "count": row[1]} for row in group_res.all()]
+
+        problem_cases_stmt = select(CaseTicket)\
+            .where((CaseTicket.status == "DETENIDO_PROBLEMA") | (CaseTicket.total_returns > 0))\
+            .order_by(CaseTicket.updated_at.desc()).limit(20)
+        p_cases = (await db.execute(problem_cases_stmt)).scalars().all()
+
+        delayed_cases = [
+            {
+                "case_code": c.case_code,
+                "patient_name": c.patient_name,
+                "current_step_name": c.current_step_name,
+                "current_assigned_email": c.current_assigned_email,
+                "status": c.status,
+                "total_returns": c.total_returns,
+                "bottleneck_reason": c.bottleneck_reason,
+                "last_problem_reported": c.last_problem_reported,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None
+            }
+            for c in p_cases
+        ]
+
+        return {
+            "total_cases": total_cases,
+            "stopped_cases": stopped_cases,
+            "completed_cases": completed_cases,
+            "in_progress_cases": max(0, total_cases - completed_cases - stopped_cases),
+            "total_returns": total_returns,
+            "total_transitions": total_transitions,
+            "bottlenecks_by_reason": bottlenecks_by_reason,
+            "delayed_cases": delayed_cases
+        }
+

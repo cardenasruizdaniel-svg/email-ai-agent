@@ -14,10 +14,14 @@ from sqlalchemy import select, update, delete
 
 from config.settings import settings
 from database.db import init_db, get_db
-from database.models import EmailMessage, Sender, CustomRule, ActivityLog, UserCorrection
+from database.models import (
+    EmailMessage, Sender, CustomRule, ActivityLog, UserCorrection,
+    WorkflowDefinition, CaseTicket, CaseHistoryLog
+)
 from database.repository import Repository
 from backend.email_client.factory import get_email_client
 from backend.services.scheduler import start_scheduler, stop_scheduler, poll_and_process_emails
+from backend.services.workflow_engine import WorkflowEngine
 
 # Configure Logging
 os.makedirs("logs", exist_ok=True)
@@ -398,7 +402,8 @@ async def get_full_config():
         "company_name": settings.COMPANY_NAME,
         "agent_name": settings.AGENT_NAME,
         "agent_role": settings.AGENT_ROLE,
-        "reply_signature": settings.REPLY_SIGNATURE
+        "reply_signature": settings.REPLY_SIGNATURE,
+        "supervisor_email": getattr(settings, "SUPERVISOR_EMAIL", "coordinacion@clinica.com")
     }
 
 @app.post("/api/config/full")
@@ -430,6 +435,138 @@ async def trigger_sync():
     """Triggers an immediate polling and execution cycle."""
     asyncio.create_task(poll_and_process_emails())
     return {"status": "success", "message": "Ciclo de lectura y clasificación iniciado."}
+
+# --- WORKFLOW & CASE TRACKING ENDPOINTS ---
+
+@app.get("/api/workflows")
+async def list_workflows(db: AsyncSession = Depends(get_db)):
+    """Lists all configured workflows, seeding default clinical workflows if empty."""
+    workflows = await Repository.get_or_create_default_workflows(db)
+    output = []
+    for wf in workflows:
+        output.append({
+            "id": wf.id,
+            "name": wf.name,
+            "description": wf.description,
+            "trigger_keywords": json.loads(wf.trigger_keywords or "[]"),
+            "trigger_category": wf.trigger_category,
+            "target_folder": wf.target_folder,
+            "supervisor_email": wf.supervisor_email,
+            "steps": json.loads(wf.steps or "[]"),
+            "is_active": wf.is_active
+        })
+    return output
+
+@app.post("/api/workflows")
+async def save_workflow(payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Creates or updates a workflow definition."""
+    wf_id = payload.get("id")
+    steps_json = json.dumps(payload.get("steps", []))
+    keywords_json = json.dumps(payload.get("trigger_keywords", []))
+
+    if wf_id:
+        stmt = select(WorkflowDefinition).where(WorkflowDefinition.id == wf_id)
+        wf = (await db.execute(stmt)).scalar_one_or_none()
+        if not wf:
+            raise HTTPException(status_code=404, detail="Flujo no encontrado")
+        wf.name = payload.get("name", wf.name)
+        wf.description = payload.get("description", wf.description)
+        wf.trigger_keywords = keywords_json
+        wf.target_folder = payload.get("target_folder", wf.target_folder)
+        wf.supervisor_email = payload.get("supervisor_email", wf.supervisor_email)
+        wf.steps = steps_json
+        wf.is_active = payload.get("is_active", True)
+    else:
+        wf = WorkflowDefinition(
+            name=payload.get("name", "Nuevo Flujo"),
+            description=payload.get("description", ""),
+            trigger_keywords=keywords_json,
+            target_folder=payload.get("target_folder", "General"),
+            supervisor_email=payload.get("supervisor_email", settings.SUPERVISOR_EMAIL),
+            steps=steps_json,
+            is_active=payload.get("is_active", True)
+        )
+        db.add(wf)
+
+    await db.commit()
+    return {"status": "success", "message": "Flujo de trabajo guardado exitosamente."}
+
+@app.get("/api/cases")
+async def list_cases(
+    status: Optional[str] = None,
+    folder: Optional[str] = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db)
+):
+    """Lists case tickets with traceability status, current holder, returns count, and folders."""
+    cases = await Repository.get_cases(db, status=status, folder=folder, limit=limit)
+    return cases
+
+@app.get("/api/cases/{case_id}")
+async def get_case_details(case_id: int, db: AsyncSession = Depends(get_db)):
+    """Returns full case ticket details and complete history audit trail."""
+    case = await Repository.get_case_details(db, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+    return case
+
+@app.post("/api/cases/{case_id}/advance")
+async def advance_case_step(case_id: int, payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Advances case to next user in chain or completes it back to the supervisor."""
+    stmt = select(CaseTicket).where(CaseTicket.id == case_id)
+    case = (await db.execute(stmt)).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+
+    actor_email = payload.get("actor_email") or case.current_assigned_email
+    comments = payload.get("comments") or "Aprobado manualmente desde el panel de control"
+
+    engine = WorkflowEngine(get_email_client())
+    updated_case = await engine.advance_step(db, case, actor_email=actor_email, comments=comments)
+
+    return {
+        "status": "success",
+        "case_code": updated_case.case_code,
+        "new_status": updated_case.status,
+        "current_step_name": updated_case.current_step_name,
+        "current_assigned_email": updated_case.current_assigned_email,
+        "total_transitions": updated_case.total_transitions
+    }
+
+@app.post("/api/cases/{case_id}/problem")
+async def report_case_problem(case_id: int, payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Reports a problem/rejection, immediately alerting the Supervisor (Principal User)."""
+    stmt = select(CaseTicket).where(CaseTicket.id == case_id)
+    case = (await db.execute(stmt)).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+
+    actor_email = payload.get("actor_email") or case.current_assigned_email
+    reason = payload.get("reason") or "Problema o retraso reportado"
+    bottleneck_category = payload.get("bottleneck_category") or "Rechazo / Inconsistencia"
+
+    engine = WorkflowEngine(get_email_client())
+    updated_case = await engine.report_problem(
+        db, case,
+        actor_email=actor_email,
+        reason=reason,
+        bottleneck_category=bottleneck_category
+    )
+
+    return {
+        "status": "success",
+        "case_code": updated_case.case_code,
+        "new_status": updated_case.status,
+        "last_problem_reported": updated_case.last_problem_reported,
+        "total_returns": updated_case.total_returns,
+        "alert_sent_to": updated_case.supervisor_email
+    }
+
+@app.get("/api/reports/bottlenecks")
+async def get_bottleneck_report(db: AsyncSession = Depends(get_db)):
+    """Returns analytics report on delays, bottlenecks, stoppage reasons, and returns."""
+    return await Repository.get_bottleneck_report(db)
+
 
 
 # Mount Static Frontend

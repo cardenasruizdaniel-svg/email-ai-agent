@@ -137,6 +137,23 @@ MOCK_SEED_EMAILS: List[Dict[str, Any]] = [
         "snippet": "Hola equipo, ¿tienen alguna novedad sobre el reenvío...",
         "date": datetime.utcnow() - timedelta(minutes=1),
         "attachments": []
+    },
+    {
+        "id": "msg_013",
+        "thread_id": "thread_patient_001",
+        "sender_email": "urgencias@centromedico.org",
+        "sender_name": "Dra. Sofía Herrera",
+        "subject": "Solicitud Ingreso Paciente: Juan David Gómez - CC 10203040",
+        "body": "Buenas tardes, remitimos solicitud formal para el ingreso hospitalario del paciente Juan David Gómez identificado con CC 10203040 para procedimiento de colecistectomía. Adjuntamos orden médica y resumen de historia clínica para su gestión.",
+        "snippet": "Remitimos solicitud formal para el ingreso hospitalario del paciente Juan David Gómez...",
+        "date": datetime.utcnow() - timedelta(minutes=1),
+        "attachments": [
+            {
+                "filename": "orden_ingreso_10203040.pdf",
+                "mime_type": "application/pdf",
+                "content_text": "ORDEN MÉDICA DE INGRESO HOSPITALARIO\nPaciente: Juan David Gómez\nDocumento: CC 10203040\nDiagnóstico: Colecistitis aguda\nServicio requerido: Cirugía / Hospitalización general\nPrioridad: ALTA"
+            }
+        ]
     }
 ]
 
@@ -145,7 +162,9 @@ class MockEmailClient(BaseEmailClient):
         self.unread_emails: List[Dict[str, Any]] = list(MOCK_SEED_EMAILS)
         self.processed_emails: List[Dict[str, Any]] = []
         self.sent_emails: List[Dict[str, Any]] = []
+        self.forwarded_emails: List[Dict[str, Any]] = []
         self.labels_applied: Dict[str, List[str]] = {}
+        self.folders_assigned: Dict[str, str] = {}
 
     async def fetch_unprocessed_emails(self, max_results: int = 20) -> List[Dict[str, Any]]:
         logger.info(f"[MockEmailClient] Fetching unprocessed emails ({len(self.unread_emails)} available)")
@@ -154,6 +173,7 @@ class MockEmailClient(BaseEmailClient):
 
     async def send_email(self, to_email: str, subject: str, body: str, thread_id: Optional[str] = None) -> bool:
         sent_record = {
+            "to": to_email,
             "to_email": to_email,
             "subject": subject,
             "body": body,
@@ -162,6 +182,34 @@ class MockEmailClient(BaseEmailClient):
         }
         self.sent_emails.append(sent_record)
         logger.info(f"[MockEmailClient] SENT EMAIL to {to_email} | Subject: {subject}")
+        return True
+
+    async def move_to_folder(self, message_id: str, folder_name: str) -> bool:
+        self.folders_assigned[message_id] = folder_name
+        logger.info(f"[MockEmailClient] MOVED message {message_id} to folder '{folder_name}'")
+        return True
+
+    async def forward_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+        thread_id: Optional[str] = None,
+        original_email_id: Optional[str] = None
+    ) -> bool:
+        forward_record = {
+            "to": to_email,
+            "to_email": to_email,
+            "subject": subject,
+            "body": body,
+            "attachments": attachments or [],
+            "thread_id": thread_id,
+            "original_email_id": original_email_id,
+            "forwarded_at": datetime.utcnow()
+        }
+        self.forwarded_emails.append(forward_record)
+        logger.info(f"[MockEmailClient] FORWARDED EMAIL to {to_email} | Subject: {subject} | Attachments: {len(attachments or [])}")
         return True
 
     async def apply_labels(self, message_id: str, label_names: List[str]) -> bool:

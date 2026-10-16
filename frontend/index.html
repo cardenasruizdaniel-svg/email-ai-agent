@@ -103,6 +103,16 @@
                 <i class="fa-solid fa-envelope"></i>
                 <span>Todos los Correos</span>
             </button>
+            <button id="tab-btn-cases" onclick="switchTab('cases')" class="tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 text-cyan-300">
+                <i class="fa-solid fa-route text-cyan-400"></i>
+                <span class="font-bold">Trazabilidad de Casos</span>
+                <span id="badge-cases-count" class="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full ml-1 font-bold">0</span>
+            </button>
+            <button id="tab-btn-bottlenecks" onclick="switchTab('bottlenecks')" class="tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2 text-rose-300">
+                <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+                <span class="font-bold">Cuellos de Botella</span>
+                <span id="badge-bottlenecks-count" class="bg-rose-500/20 text-rose-400 text-xs px-2 py-0.5 rounded-full ml-1 font-bold">0</span>
+            </button>
             <button id="tab-btn-review" onclick="switchTab('review')" class="tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2">
                 <i class="fa-solid fa-user-check"></i>
                 <span>Revisión Humana <span id="badge-review-count" class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full ml-1 font-bold">0</span></span>
@@ -121,7 +131,7 @@
             </button>
             <button id="tab-btn-config" onclick="switchTab('config')" class="tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2">
                 <i class="fa-solid fa-gear text-indigo-400"></i>
-                <span class="text-indigo-300 font-bold">Configuración del Sistema</span>
+                <span class="text-indigo-300 font-bold">Configuración</span>
             </button>
         </div>
 
@@ -154,6 +164,139 @@
                 </div>
             </div>
         </div>
+
+        <!-- TAB CONTENT: CASE TRACEABILITY -->
+        <div id="tab-cases" class="tab-content hidden">
+            <div class="bg-slate-800 border border-slate-700/60 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 bg-slate-800/80 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                        <h2 class="font-bold text-cyan-400 flex items-center space-x-2 text-base">
+                            <i class="fa-solid fa-route"></i>
+                            <span>Trazabilidad y Diligencia de Casos Secuenciales</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Control en tiempo real de correos que circulan entre usuarios: admisiones, auditoría, asignación de camas y supervisión.</p>
+                    </div>
+                    <div class="flex items-center space-x-3 text-xs">
+                        <select id="case-folder-filter" onchange="loadCases()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+                            <option value="">📁 Todas las Carpetas</option>
+                            <option value="Ingreso Pacientes">📁 Ingreso Pacientes</option>
+                            <option value="Autorizaciones">📁 Autorizaciones</option>
+                            <option value="Facturación">📁 Facturación</option>
+                            <option value="General">📁 General</option>
+                        </select>
+                        <select id="case-status-filter" onchange="loadCases()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
+                            <option value="">Todos los Estados</option>
+                            <option value="EN_PROCESO">⏳ En Proceso</option>
+                            <option value="DETENIDO_PROBLEMA">🚨 Detenido con Problema</option>
+                            <option value="COMPLETADO">✅ Completado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/60 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                            <tr>
+                                <th class="p-3">Código Caso</th>
+                                <th class="p-3">Paciente / Documento</th>
+                                <th class="p-3">Carpeta Asignada</th>
+                                <th class="p-3">Etapa Actual & Responsable</th>
+                                <th class="p-3 text-center">Transiciones</th>
+                                <th class="p-3 text-center">Retornos / Problemas</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3 text-right">Trazabilidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cases-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: BOTTLENECK & DELAYS REPORT -->
+        <div id="tab-bottlenecks" class="tab-content hidden space-y-6">
+            <!-- Bottleneck KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between shadow-md">
+                    <div class="flex justify-between items-center text-slate-400 text-xs">
+                        <span class="font-semibold text-rose-300">Casos Detenidos</span>
+                        <i class="fa-solid fa-hand text-rose-400 text-lg"></i>
+                    </div>
+                    <div id="bn-stat-stopped" class="text-3xl font-black text-rose-400 mt-2">0</div>
+                    <span class="text-[11px] text-slate-400 mt-1">Requieren correctivo del supervisor</span>
+                </div>
+
+                <div class="bg-slate-800 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between shadow-md">
+                    <div class="flex justify-between items-center text-slate-400 text-xs">
+                        <span class="font-semibold text-amber-300">Total Devoluciones</span>
+                        <i class="fa-solid fa-arrow-rotate-left text-amber-400 text-lg"></i>
+                    </div>
+                    <div id="bn-stat-returns" class="text-3xl font-black text-amber-400 mt-2">0</div>
+                    <span class="text-[11px] text-slate-400 mt-1">Rechazos o reprocesos acumulados</span>
+                </div>
+
+                <div class="bg-slate-800 border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between shadow-md">
+                    <div class="flex justify-between items-center text-slate-400 text-xs">
+                        <span class="font-semibold text-emerald-300">Casos Completados</span>
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+                    </div>
+                    <div id="bn-stat-completed" class="text-3xl font-black text-emerald-400 mt-2">0</div>
+                    <span class="text-[11px] text-slate-400 mt-1">Dossiers cerrados satisfactoriamente</span>
+                </div>
+
+                <div class="bg-slate-800 border border-indigo-500/30 rounded-xl p-4 flex flex-col justify-between shadow-md">
+                    <div class="flex justify-between items-center text-slate-400 text-xs">
+                        <span class="font-semibold text-indigo-300">Pases Realizados</span>
+                        <i class="fa-solid fa-arrows-split-up-and-left text-indigo-400 text-lg"></i>
+                    </div>
+                    <div id="bn-stat-transitions" class="text-3xl font-black text-indigo-400 mt-2">0</div>
+                    <span class="text-[11px] text-slate-400 mt-1">Total de avances entre actores</span>
+                </div>
+            </div>
+
+            <!-- Bottleneck Causes Breakdown -->
+            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-5 shadow-xl">
+                <h3 class="font-bold text-slate-200 text-sm mb-1 flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-pie text-rose-400"></i>
+                    <span>Causas Principales que Detienen el Avance de Pacientes</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-4">Análisis de cuellos de botella clasificados automáticamente por la IA a partir de las respuestas de los usuarios.</p>
+                <div id="bn-causes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Delayed Cases Table -->
+            <div class="bg-slate-800 border border-slate-700/60 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 bg-slate-800/80 border-b border-slate-700">
+                    <h3 class="font-bold text-rose-400 text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Casos Detenidos o con Retrasos Pendientes de Correctivo</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Expedientes que han sido devueltos o no aceptados por los usuarios en la cadena de diligencia.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/60 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                            <tr>
+                                <th class="p-3">Código</th>
+                                <th class="p-3">Paciente</th>
+                                <th class="p-3">Etapa Detenida & Responsable</th>
+                                <th class="p-3">Tipo de Cuello de Botella</th>
+                                <th class="p-3">Motivo Exacto Reportado</th>
+                                <th class="p-3 text-center">Devoluciones</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bn-delayed-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
 
         <!-- TAB CONTENT 2: HUMAN REVIEW QUEUE -->
         <div id="tab-review" class="tab-content hidden">
@@ -360,6 +503,12 @@
                         </div>
 
                         <div>
+                            <label class="block text-slate-400 mb-1">Correo del Usuario Principal / Supervisor (Alertas de Detención & Cierre)</label>
+                            <input type="email" id="cfg-supervisor-email" placeholder="coordinacion@clinica.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            <p class="text-[11px] text-slate-400 mt-0.5">Recibe alertas inmediatas en caso de novedades/rechazos para aplicar correctivos, y el expediente completo al culminar.</p>
+                        </div>
+
+                        <div>
                             <label class="block text-slate-400 mb-1">Firma para Correos Salientes</label>
                             <textarea id="cfg-signature" rows="2" placeholder="Atentamente,\nGestión Automática - Sura" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-sans"></textarea>
                         </div>
@@ -483,6 +632,119 @@
             <div class="flex justify-end space-x-2 pt-2">
                 <button onclick="closeRuleModal()" class="bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg">Cancelar</button>
                 <button onclick="saveRule()" class="bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-lg">Guardar Regla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CASE DETAILS & TIMELINE MODAL -->
+    <div id="case-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <span id="case-modal-code" class="bg-cyan-500/20 text-cyan-300 font-mono font-bold px-2.5 py-1 rounded-md text-xs border border-cyan-500/40">CASO-2026-0001</span>
+                    <h3 id="case-modal-patient" class="font-bold text-white text-base">Juan David Gómez</h3>
+                    <span id="case-modal-doc" class="text-xs text-slate-400">CC 10203040</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="case-modal-status-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">EN PROCESO</span>
+                    <button onclick="closeCaseModal()" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-5 overflow-y-auto space-y-5 text-xs text-slate-300">
+                <!-- Case Summary Header -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Carpeta Asignada</span>
+                        <span id="case-modal-folder" class="font-bold text-cyan-300 text-xs mt-0.5 block">📁 Ingreso Pacientes</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Etapa Actual</span>
+                        <span id="case-modal-step" class="font-bold text-white text-xs mt-0.5 block">Admisiones</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Responsable Actual</span>
+                        <span id="case-modal-actor" class="font-semibold text-slate-200 text-xs mt-0.5 block truncate">admisiones@clinica.com</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">Transiciones / Retornos</span>
+                        <span id="case-modal-counts" class="font-bold text-xs mt-0.5 block">1 pases / <span class="text-rose-400">0 retrasos</span></span>
+                    </div>
+                </div>
+
+                <!-- Last Problem Alert (if any) -->
+                <div id="case-modal-alert-box" class="hidden bg-rose-500/15 border border-rose-500/40 rounded-xl p-3 text-rose-300">
+                    <div class="flex items-center space-x-2 font-bold text-xs text-rose-400">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Novedad Reportada (Proceso Detenido)</span>
+                    </div>
+                    <p id="case-modal-alert-text" class="mt-1 text-xs text-rose-200"></p>
+                </div>
+
+                <!-- Timeline Audit Trail -->
+                <div>
+                    <h4 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3 flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left text-cyan-400"></i>
+                        <span>Historial Cronológico de Diligencia & Trazabilidad</span>
+                    </h4>
+                    <div id="case-modal-timeline" class="space-y-3 relative pl-4 border-l-2 border-slate-700">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Action Diligence Form -->
+                <div id="case-modal-actions-area" class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 space-y-3">
+                    <h4 class="font-bold text-white text-xs flex items-center space-x-1">
+                        <i class="fa-solid fa-user-pen text-indigo-400"></i>
+                        <span>Gestión y Diligencia de la Etapa</span>
+                    </h4>
+                    <div>
+                        <label class="block text-slate-400 text-[11px] mb-1">Observaciones / Comentarios de diligencia:</label>
+                        <input type="text" id="case-action-comments" placeholder="Ej: Documentos validados conforme / Cama 402 asignada" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button onclick="advanceCaseAction()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center space-x-1.5 shadow-md">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Aprobar y Pasar a Siguiente Usuario</span>
+                        </button>
+                        <button onclick="toggleProblemForm()" class="bg-rose-600/80 hover:bg-rose-600 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center space-x-1.5 shadow-md">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <span>Reportar Novedad / Problema (Alertar Supervisor)</span>
+                        </button>
+                    </div>
+
+                    <!-- Problem form toggle -->
+                    <div id="case-problem-form" class="hidden pt-3 border-t border-slate-700/80 space-y-2">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-400 text-[11px] mb-1">Tipo de Cuello de Botella</label>
+                                <select id="case-problem-category" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                                    <option value="Falta de documento o información">Falta de documento o información</option>
+                                    <option value="Sin disponibilidad de camas">Sin disponibilidad de camas</option>
+                                    <option value="Falta de autorización EPS">Falta de autorización EPS</option>
+                                    <option value="Inconsistencia de datos del paciente">Inconsistencia de datos del paciente</option>
+                                    <option value="Rechazo médico / pertinencia clínica">Rechazo médico / pertinencia clínica</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 text-[11px] mb-1">Motivo Específico del Problema</label>
+                                <input type="text" id="case-problem-reason" placeholder="Describa la novedad exacta que detiene el ingreso..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                            </div>
+                        </div>
+                        <button onclick="submitProblemAction()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-md">
+                            <i class="fa-solid fa-paper-plane mr-1"></i> Enviar Alerta Inmediata a Coordinación
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 bg-slate-900 border-t border-slate-700 flex justify-end">
+                <button onclick="closeCaseModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-1.5 rounded-lg text-xs">Cerrar</button>
             </div>
         </div>
     </div>

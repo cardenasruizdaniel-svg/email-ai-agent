@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     COMPANY_NAME: str = "Empresa ABC"
     AGENT_NAME: str = "Asistente Virtual IA"
     AGENT_ROLE: str = "Gestor de Atención al Cliente"
+    SUPERVISOR_EMAIL: str = "coordinacion@clinica.com"
     COMPANY_PHONE: str = "+57 300 123 4567"
     COMPANY_HOURS: str = "Lunes a Viernes de 8:00 AM a 5:00 PM"
     COMPANY_WEBSITE: str = "https://empresaabc.com"

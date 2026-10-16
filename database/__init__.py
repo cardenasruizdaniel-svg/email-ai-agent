@@ -1,5 +1,8 @@
 from .db import init_db, get_db, AsyncSessionLocal, engine
-from .models import Base, Sender, EmailMessage, CustomRule, ActivityLog, UserCorrection
+from .models import (
+    Base, Sender, EmailMessage, CustomRule, ActivityLog, UserCorrection,
+    WorkflowDefinition, CaseTicket, CaseHistoryLog
+)
 
 __all__ = [
     "init_db",
@@ -12,4 +15,7 @@ __all__ = [
     "CustomRule",
     "ActivityLog",
     "UserCorrection",
+    "WorkflowDefinition",
+    "CaseTicket",
+    "CaseHistoryLog",
 ]

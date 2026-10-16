@@ -147,6 +147,43 @@ class GmailAPIClient(BaseEmailClient):
             logger.error(f"[GmailAPIClient] Error applying labels: {e}")
             return False
 
+    async def move_to_folder(self, message_id: str, folder_name: str) -> bool:
+        if not self.service:
+            return False
+        try:
+            # Gmail uses labels as folders
+            existing_labels = self.service.users().labels().list(userId='me').execute().get('labels', [])
+            label_map = {l['name']: l['id'] for l in existing_labels}
+            if folder_name not in label_map:
+                new_lbl = self.service.users().labels().create(
+                    userId='me',
+                    body={'name': folder_name, 'labelListVisibility': 'labelShow', 'messageListVisibility': 'show'}
+                ).execute()
+                folder_id = new_lbl['id']
+            else:
+                folder_id = label_map[folder_name]
+
+            self.service.users().messages().batchModify(
+                userId='me',
+                body={'ids': [message_id], 'addLabelIds': [folder_id], 'removeLabelIds': ['INBOX']}
+            ).execute()
+            logger.info(f"[GmailAPIClient] Moved message {message_id} to folder/label '{folder_name}'")
+            return True
+        except Exception as e:
+            logger.error(f"[GmailAPIClient] Error moving to folder '{folder_name}': {e}")
+            return False
+
+    async def forward_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+        thread_id: Optional[str] = None,
+        original_email_id: Optional[str] = None
+    ) -> bool:
+        return await self.send_email(to_email=to_email, subject=subject, body=body, thread_id=thread_id)
+
     async def mark_as_read(self, message_id: str) -> bool:
         if not self.service:
             return False

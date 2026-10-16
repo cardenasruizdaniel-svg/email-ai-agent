@@ -58,13 +58,31 @@ class IMAPSMTPClient(BaseEmailClient):
                         sender_email = sender.split("<")[1].replace(">", "").strip() if "<" in sender else sender
                         
                         body = ""
+                        attachments = []
                         if msg.is_multipart():
                             for part in msg.walk():
-                                if part.get_content_type() == "text/plain":
-                                    body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                                    break
+                                content_type = part.get_content_type()
+                                content_disposition = str(part.get("Content-Disposition", ""))
+                                filename = part.get_filename()
+                                if filename:
+                                    dh = decode_header(filename)[0]
+                                    if isinstance(dh[0], bytes):
+                                        filename = dh[0].decode(dh[1] or "utf-8", errors="ignore")
+                                    payload = part.get_payload(decode=True)
+                                    attachments.append({
+                                        "filename": filename,
+                                        "mime_type": content_type,
+                                        "bytes": payload,
+                                        "content_text": ""
+                                    })
+                                elif content_type == "text/plain" and "attachment" not in content_disposition:
+                                    payload = part.get_payload(decode=True)
+                                    if payload:
+                                        body += payload.decode("utf-8", errors="ignore") + "\n"
                         else:
-                            body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+                            payload = msg.get_payload(decode=True)
+                            if payload:
+                                body = payload.decode("utf-8", errors="ignore")
                             
                         fetched.append({
                             "id": msg_id.decode("utf-8"),
@@ -75,7 +93,7 @@ class IMAPSMTPClient(BaseEmailClient):
                             "body": body,
                             "snippet": body[:150] if body else "",
                             "date": datetime.utcnow(),
-                            "attachments": []
+                            "attachments": attachments
                         })
                         
             mail.logout()
@@ -94,6 +112,9 @@ class IMAPSMTPClient(BaseEmailClient):
             msg["Subject"] = subject
             msg["From"] = self.user
             msg["To"] = to_email
+            if thread_id:
+                msg["In-Reply-To"] = f"<{thread_id}>"
+                msg["References"] = f"<{thread_id}>"
             
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
@@ -104,6 +125,80 @@ class IMAPSMTPClient(BaseEmailClient):
             return True
         except Exception as e:
             logger.error(f"[IMAPSMTPClient] Failed to send email via SMTP: {e}")
+            return False
+
+    async def forward_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+        thread_id: Optional[str] = None,
+        original_email_id: Optional[str] = None
+    ) -> bool:
+        if not self.user or not self.password:
+            logger.error("[IMAPSMTPClient] SMTP credentials missing.")
+            return False
+
+        try:
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.base import MIMEBase
+            from email import encoders
+
+            msg = MIMEMultipart()
+            msg["Subject"] = subject
+            msg["From"] = self.user
+            msg["To"] = to_email
+            if thread_id:
+                msg["In-Reply-To"] = f"<{thread_id}>"
+                msg["References"] = f"<{thread_id}>"
+
+            msg.attach(MIMEText(body, "plain", "utf-8"))
+
+            if attachments:
+                for att in attachments:
+                    fname = att.get("filename", "adjunto.pdf")
+                    fbytes = att.get("bytes")
+                    if not fbytes and att.get("content_text"):
+                        fbytes = att.get("content_text").encode("utf-8")
+                    if fbytes:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(fbytes)
+                        encoders.encode_base64(part)
+                        part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+                        msg.attach(part)
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.user, self.password)
+                server.sendmail(self.user, [to_email], msg.as_string())
+
+            logger.info(f"[IMAPSMTPClient] Forwarded email to {to_email} with {len(attachments or [])} attachments")
+            return True
+        except Exception as e:
+            logger.error(f"[IMAPSMTPClient] Failed to forward email: {e}")
+            return False
+
+    async def move_to_folder(self, message_id: str, folder_name: str) -> bool:
+        if not self.user or not self.password:
+            return False
+        try:
+            mail = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
+            mail.login(self.user, self.password)
+            try:
+                mail.create(f'"{folder_name}"')
+            except Exception:
+                pass
+            mail.select("inbox")
+            res, _ = mail.copy(message_id.encode("utf-8"), f'"{folder_name}"')
+            if res == "OK":
+                mail.store(message_id.encode("utf-8"), "+FLAGS", "\\Deleted")
+                mail.expunge()
+                logger.info(f"[IMAPSMTPClient] Moved message {message_id} to folder '{folder_name}'")
+            mail.logout()
+            return True
+        except Exception as e:
+            logger.error(f"[IMAPSMTPClient] Error moving to folder '{folder_name}': {e}")
             return False
 
     async def apply_labels(self, message_id: str, label_names: List[str]) -> bool:

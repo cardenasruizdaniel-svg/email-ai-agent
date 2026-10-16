@@ -7,6 +7,7 @@ from ai.analyzer import EmailAnalyzer
 from database.repository import Repository
 from .decision_engine import DecisionEngine
 from .reply_generator import ReplyGenerator
+from .workflow_engine import WorkflowEngine
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class EmailDispatcher:
         self.email_client = email_client
         self.analyzer = EmailAnalyzer()
         self.reply_generator = ReplyGenerator()
+        self.workflow_engine = WorkflowEngine(email_client)
 
     async def process_incoming_email(self, email_raw: Dict[str, Any], db: AsyncSession) -> Dict[str, Any]:
         """
@@ -124,6 +126,17 @@ class EmailDispatcher:
 
         # Save to database
         saved_record = await Repository.save_email(db, db_email_dict)
+
+        # Step 9: Sequential Workflow & Dynamic Folder Routing
+        case_ticket = await self.workflow_engine.handle_incoming_email(
+            db=db,
+            email_record=saved_record,
+            analysis=decision
+        )
+        if case_ticket:
+            db_email_dict["case_code"] = case_ticket.case_code
+            db_email_dict["target_folder"] = case_ticket.target_folder
+            db_email_dict["case_status"] = case_ticket.status
 
         # Log action to audit history
         await Repository.log_activity(
