@@ -558,7 +558,16 @@ class Repository:
     async def get_user_by_username(db: AsyncSession, username: str) -> Optional[UserAccount]:
         stmt = select(UserAccount).where(UserAccount.username == username.strip().lower())
         res = await db.execute(stmt)
-        return res.scalar_one_or_none()
+        user = res.scalar_one_or_none()
+        if not user:
+            # Safety check: if no users exist in database yet, auto-seed defaults
+            count_stmt = select(func.count(UserAccount.id))
+            total = (await db.execute(count_stmt)).scalar() or 0
+            if total == 0:
+                await Repository.seed_default_users(db)
+                res = await db.execute(stmt)
+                user = res.scalar_one_or_none()
+        return user
 
     @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[UserAccount]:
@@ -571,6 +580,11 @@ class Repository:
         stmt = select(UserAccount).order_by(UserAccount.id.asc())
         res = await db.execute(stmt)
         users = list(res.scalars().all())
+        if not users:
+            # Auto-seed default users if empty
+            await Repository.seed_default_users(db)
+            res = await db.execute(stmt)
+            users = list(res.scalars().all())
         return [
             {
                 "id": u.id,

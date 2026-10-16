@@ -1174,12 +1174,37 @@ async function submitResolveModal() {
 // --- USER MANAGEMENT FUNCTIONS (ADMIN) ---
 
 async function loadUsers() {
+    const tbody = document.getElementById("users-table-body");
+    if (!tbody) return;
     try {
         const res = await fetch("/api/users");
+        if (!res.ok) {
+            console.error("HTTP error loading users:", res.status);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="p-4 text-center text-amber-300 font-semibold bg-amber-500/10">
+                        <i class="fa-solid fa-triangle-exclamation mr-1.5"></i>
+                        El backend aún no tiene activos los endpoints de usuarios. Reinicie el servicio en su terminal:
+                        <code class="block mt-1 font-mono text-xs text-white bg-slate-900 px-2 py-1 rounded inline-block">sudo systemctl restart email-ai-agent</code>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
         const users = await res.json();
-        const tbody = document.getElementById("users-table-body");
-        if (!tbody) return;
         tbody.innerHTML = "";
+
+        if (!Array.isArray(users) || users.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="p-6 text-center text-slate-400">
+                        <i class="fa-solid fa-users text-2xl block mb-2 text-slate-500"></i>
+                        No hay usuarios adicionales registrados. Use el botón <b class="text-purple-400">+ Nuevo Usuario IPS</b> para dar de alta colaboradores.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
 
         users.forEach(u => {
             const tr = document.createElement("tr");
@@ -1195,7 +1220,7 @@ async function loadUsers() {
                 <td class="p-3 font-bold text-cyan-300">${u.assigned_stage}</td>
                 <td class="p-3 text-slate-300">${u.email}</td>
                 <td class="p-3 text-slate-400">${u.phone || '-'}</td>
-                <td class="p-3"><span class="text-emerald-400 font-bold">Activo</span></td>
+                <td class="p-3"><span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i>Activo</span></td>
                 <td class="p-3 text-right">
                     <button onclick="deleteUser(${u.id}, '${u.username}')" class="text-rose-400 hover:text-rose-300 p-1" title="Eliminar usuario">
                         <i class="fa-solid fa-trash"></i>
@@ -1206,37 +1231,55 @@ async function loadUsers() {
         });
     } catch (e) {
         console.error("Error loading users:", e);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-rose-400"><i class="fa-solid fa-circle-exclamation mr-1"></i> Error de conexión al cargar usuarios.</td></tr>`;
+        }
     }
 }
 
 function openCreateUserModal() {
+    const modal = document.getElementById("user-modal");
+    if (!modal) {
+        alert("Error: No se encontró el modal de usuarios en la página. Recargue la página (Ctrl+F5).");
+        return;
+    }
     document.getElementById("user-modal-id").value = "";
     document.getElementById("user-modal-username").value = "";
     document.getElementById("user-modal-password").value = "";
     document.getElementById("user-modal-fullname").value = "";
     document.getElementById("user-modal-email").value = "";
     document.getElementById("user-modal-phone").value = "";
-    document.getElementById("user-modal").classList.remove("hidden");
+    modal.classList.remove("hidden");
 }
 
 function closeUserModal() {
-    document.getElementById("user-modal").classList.add("hidden");
+    const modal = document.getElementById("user-modal");
+    if (modal) modal.classList.add("hidden");
 }
 
 async function submitUserModal() {
-    const payload = {
-        username: document.getElementById("user-modal-username").value.trim(),
-        password: document.getElementById("user-modal-password").value,
-        full_name: document.getElementById("user-modal-fullname").value.trim(),
-        email: document.getElementById("user-modal-email").value.trim(),
-        role: document.getElementById("user-modal-role").value,
-        assigned_stage: document.getElementById("user-modal-stage").value,
-        phone: document.getElementById("user-modal-phone").value.trim()
-    };
-    if (!payload.username || !payload.password || !payload.full_name || !payload.email) {
-        alert("Todos los campos obligatorios deben ser diligenciados.");
+    const uname = document.getElementById("user-modal-username").value.trim();
+    const pwd = document.getElementById("user-modal-password").value;
+    const fname = document.getElementById("user-modal-fullname").value.trim();
+    const email = document.getElementById("user-modal-email").value.trim();
+    const role = document.getElementById("user-modal-role").value;
+    const stage = document.getElementById("user-modal-stage").value;
+    const phone = document.getElementById("user-modal-phone").value.trim();
+
+    if (!uname || !pwd || !fname || !email) {
+        alert("Por favor diligencie todos los campos obligatorios: Nombre Completo, Usuario, Contraseña y Correo Electrónico.");
         return;
     }
+
+    const payload = {
+        username: uname,
+        password: pwd,
+        full_name: fname,
+        email: email,
+        role: role,
+        assigned_stage: stage,
+        phone: phone
+    };
 
     try {
         const res = await fetch("/api/users", {
@@ -1246,14 +1289,14 @@ async function submitUserModal() {
         });
         const data = await res.json();
         if (res.ok) {
-            alert("✅ Usuario de la IPS registrado exitosamente.");
+            alert(`✅ Usuario '${uname}' (${fname}) registrado exitosamente.`);
             closeUserModal();
             loadUsers();
         } else {
-            alert("Error: " + data.detail);
+            alert("Error del servidor: " + (data.detail || JSON.stringify(data)));
         }
     } catch (e) {
-        alert("Error al registrar usuario.");
+        alert("Error de conexión al registrar usuario. Asegúrese de haber reiniciado el servicio en el iMac con: sudo systemctl restart email-ai-agent");
     }
 }
 
@@ -1270,4 +1313,11 @@ async function deleteUser(userId, username) {
         alert("Error de conexión al eliminar.");
     }
 }
+
+// Ensure global scope accessibility
+window.openCreateUserModal = openCreateUserModal;
+window.closeUserModal = closeUserModal;
+window.submitUserModal = submitUserModal;
+window.loadUsers = loadUsers;
+window.deleteUser = deleteUser;
 
