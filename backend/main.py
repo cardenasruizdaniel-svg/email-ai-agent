@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Body
@@ -16,9 +17,10 @@ from config.settings import settings
 from database.db import init_db, get_db
 from database.models import (
     EmailMessage, Sender, CustomRule, ActivityLog, UserCorrection,
-    WorkflowDefinition, CaseTicket, CaseHistoryLog
+    WorkflowDefinition, CaseTicket, CaseHistoryLog, UserAccount
 )
 from database.repository import Repository
+from backend.services.auth import AuthService
 from backend.email_client.factory import get_email_client
 from backend.services.scheduler import start_scheduler, stop_scheduler, poll_and_process_emails
 from backend.services.workflow_engine import WorkflowEngine
@@ -41,6 +43,15 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Database...")
     await init_db()
     
+    # Seed default workflows & users for IPS Domiciliaria
+    from database.db import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        try:
+            await Repository.get_or_create_default_workflows(session)
+            await Repository.seed_default_users(session)
+        except Exception as e:
+            logger.warning(f"Could not run seeds on startup: {e}")
+
     logger.info("Starting 24/7 Background Scheduler...")
     start_scheduler()
     
@@ -495,11 +506,17 @@ async def save_workflow(payload: Dict[str, Any] = Body(...), db: AsyncSession = 
 async def list_cases(
     status: Optional[str] = None,
     folder: Optional[str] = None,
+    assigned_email: Optional[str] = None,
+    stage: Optional[str] = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db)
 ):
     """Lists case tickets with traceability status, current holder, returns count, and folders."""
-    cases = await Repository.get_cases(db, status=status, folder=folder, limit=limit)
+    cases = await Repository.get_cases(
+        db, status=status, folder=folder,
+        assigned_email=assigned_email, stage=stage,
+        limit=limit
+    )
     return cases
 
 @app.get("/api/cases/{case_id}")
@@ -562,10 +579,161 @@ async def report_case_problem(case_id: int, payload: Dict[str, Any] = Body(...),
         "alert_sent_to": updated_case.supervisor_email
     }
 
+@app.post("/api/cases/{case_id}/resolve")
+async def resolve_case_problem(case_id: int, payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Unblocks a case stopped by problem/rejection. Logs resolution and notifies assigned user."""
+    resolved_by = payload.get("resolved_by") or settings.SUPERVISOR_EMAIL
+    resolution_notes = payload.get("resolution_notes") or "Novedad resuelta por la Coordinación"
+    resume_step = payload.get("resume_step", None)
+
+    case = await Repository.resolve_case_problem(
+        db, case_id=case_id,
+        resolved_by=resolved_by,
+        resolution_notes=resolution_notes,
+        resume_step_number=resume_step
+    )
+    if not case:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+
+    # Send unblock notice to the operator
+    client = get_email_client()
+    notice_subject = f"[REANUDADO] Caso {case.case_code} desmarcado - Listo para diligencia: {case.patient_name}"
+    notice_body = (
+        f"Estimado/a equipo ({case.current_assigned_email}),\n\n"
+        f"La novedad reportada para el caso {case.case_code} del paciente {case.patient_name} "
+        f"ha sido resuelta por la Coordinación ({resolved_by}).\n\n"
+        f"NOTAS DE SUBSANACIÓN / ACCIÓN:\n"
+        f"{resolution_notes}\n\n"
+        f"El caso se encuentra nuevamente en estado ACTIVO en su bandeja para continuar el flujo de atención domiciliaria."
+    )
+    try:
+        await client.send_email(
+            to_email=case.current_assigned_email,
+            subject=notice_subject,
+            body=notice_body,
+            thread_id=case.thread_id
+        )
+    except Exception as e:
+        logger.warning(f"Failed to dispatch resolution email: {e}")
+
+    return {
+        "status": "success",
+        "message": "Novedad resuelta exitosamente. Flujo reanudado.",
+        "case_code": case.case_code,
+        "status": case.status,
+        "current_step_name": case.current_step_name
+    }
+
 @app.get("/api/reports/bottlenecks")
 async def get_bottleneck_report(db: AsyncSession = Depends(get_db)):
     """Returns analytics report on delays, bottlenecks, stoppage reasons, and returns."""
     return await Repository.get_bottleneck_report(db)
+
+# ================= AUTHENTICATION & USER MANAGEMENT ENDPOINTS =================
+
+@app.post("/api/auth/login")
+async def auth_login(payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Authenticates user credentials and issues a secure session token."""
+    username = payload.get("username", "").strip().lower()
+    password = payload.get("password", "")
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Debe ingresar usuario y contraseña")
+
+    user = await Repository.get_user_by_username(db, username)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos, o cuenta inactiva")
+
+    if not AuthService.verify_password(password, user.password_hash, user.salt):
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+    user.last_login = datetime.utcnow()
+    await db.commit()
+
+    token = AuthService.create_session(user)
+    return {
+        "status": "success",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "assigned_stage": user.assigned_stage,
+            "phone": user.phone
+        }
+    }
+
+@app.get("/api/auth/me")
+async def auth_me(token: Optional[str] = Query(None)):
+    """Validates the current session token."""
+    session = AuthService.get_session(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Sesión expirada o no autenticado")
+    return {"status": "success", "user": session}
+
+@app.post("/api/auth/logout")
+async def auth_logout(payload: Dict[str, Any] = Body(...)):
+    """Destroys active session token."""
+    token = payload.get("token", "")
+    AuthService.destroy_session(token)
+    return {"status": "success", "message": "Sesión cerrada correctamente"}
+
+@app.get("/api/users")
+async def list_users(db: AsyncSession = Depends(get_db)):
+    """Lists all registered system users (for Admin/Supervisor)."""
+    return await Repository.get_all_users(db)
+
+@app.post("/api/users")
+async def create_user(payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Creates a new user account with role and assigned stage."""
+    username = payload.get("username", "").strip().lower()
+    password = payload.get("password", "")
+    full_name = payload.get("full_name", "").strip()
+    email = payload.get("email", "").strip().lower()
+    role = payload.get("role", "OPERADOR").upper()
+    assigned_stage = payload.get("assigned_stage", "TODAS")
+    phone = payload.get("phone", "")
+
+    if not username or not password or not full_name or not email:
+        raise HTTPException(status_code=400, detail="Todos los campos obligatorios deben ser diligenciados")
+
+    existing = await Repository.get_user_by_username(db, username)
+    if existing:
+        raise HTTPException(status_code=400, detail=f"El nombre de usuario '{username}' ya existe")
+
+    user = await Repository.create_user(
+        db,
+        username=username,
+        password=password,
+        full_name=full_name,
+        email=email,
+        role=role,
+        assigned_stage=assigned_stage,
+        phone=phone
+    )
+    return {
+        "status": "success",
+        "message": "Usuario creado exitosamente",
+        "user_id": user.id,
+        "username": user.username
+    }
+
+@app.put("/api/users/{user_id}")
+async def update_user(user_id: int, payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
+    """Updates user information or password."""
+    updated = await Repository.update_user(db, user_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return {"status": "success", "message": "Usuario actualizado exitosamente"}
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Deletes a user account."""
+    success = await Repository.delete_user(db, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return {"status": "success", "message": "Usuario eliminado exitosamente"}
 
 
 

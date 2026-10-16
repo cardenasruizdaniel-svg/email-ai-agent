@@ -144,11 +144,20 @@ class CaseTicket(Base):
     status = Column(String, default="EN_PROCESO", index=True) 
     # EN_PROCESO, EN_APROBACION, DETENIDO_PROBLEMA, DEVUELTO, COMPLETADO
     
+    # Home Health Care (IPS Domiciliaria) details
+    patient_address = Column(String, default="")
+    city_zone = Column(String, default="")
+    eps_name = Column(String, default="")
+    service_requested = Column(String, default="")
+    
     # Metrics
     total_transitions = Column(Integer, default=1) # Times advanced across steps
     total_returns = Column(Integer, default=0)     # Times rejected/returned with problems
     last_problem_reported = Column(Text, default="")
     bottleneck_reason = Column(Text, default="")   # Categorized reason (e.g. "Falta de documento", "Sin disponibilidad")
+    resolution_notes = Column(Text, default="")    # Corrective action registered by Admin
+    resolved_by = Column(String, default="")
+    resolved_at = Column(DateTime, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -166,10 +175,26 @@ class CaseHistoryLog(Base):
     step_name = Column(String, default="")
     actor_email = Column(String, default="")
     action = Column(String, nullable=False) 
-    # INICIADO, REENVIADO_ETAPA, GESTION_APROBADA, PROBLEMA_REPORTADO, ALERTA_SUPERVISOR_ENVIADA, COMPLETADO_FINAL
+    # INICIADO, REENVIADO_ETAPA, GESTION_APROBADA, PROBLEMA_REPORTADO, ALERTA_SUPERVISOR_ENVIADA, NOVEDAD_RESUELTA, COMPLETADO_FINAL
     comments = Column(Text, default="")
     problem_details = Column(Text, default="")
     duration_hours = Column(Float, default=0.0)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     case_rel = relationship("CaseTicket", back_populates="history_logs", lazy="selectin")
+
+class UserAccount(Base):
+    __tablename__ = "user_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    salt = Column(String, nullable=False)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    role = Column(String, default="OPERADOR") # ADMIN, OPERADOR
+    assigned_stage = Column(String, default="TODAS") # Admisiones, Auditoría Médica, Logística y Asignación de Rutas, TODAS
+    phone = Column(String, default="")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)

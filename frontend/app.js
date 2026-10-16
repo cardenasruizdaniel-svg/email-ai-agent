@@ -1,24 +1,164 @@
 let allEmails = [];
 let currentSelectedEmailId = null;
 let currentSelectedCaseId = null;
+let currentUser = null;
+let currentToken = null;
+let currentResolveCaseId = null;
+let currentRejectCaseId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadStats();
-    loadEmails();
-    loadCases();
-    loadBottlenecks();
-    loadSenders();
-    loadRules();
-    loadLogs();
+    if (initAuth()) {
+        loadAllData();
+    }
 
     // Auto refresh every 10 seconds
     setInterval(() => {
-        loadStats();
-        loadEmails();
-        loadCases();
-        loadBottlenecks();
+        if (currentUser) {
+            loadStats();
+            loadMyCases();
+            loadCases();
+            loadStoppedCases();
+            loadBottlenecks();
+        }
     }, 10000);
 });
+
+function initAuth() {
+    const userStr = localStorage.getItem("ips_user");
+    const token = localStorage.getItem("ips_token");
+    if (!userStr || !token) {
+        showLoginModal();
+        return false;
+    }
+    try {
+        currentUser = JSON.parse(userStr);
+        currentToken = token;
+        renderUserBadge();
+        applyRolePermissions();
+        return true;
+    } catch (e) {
+        showLoginModal();
+        return false;
+    }
+}
+
+function showLoginModal() {
+    const modal = document.getElementById("login-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function hideLoginModal() {
+    const modal = document.getElementById("login-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function renderUserBadge() {
+    if (!currentUser) return;
+    const nameEl = document.getElementById("user-display-name");
+    const roleEl = document.getElementById("user-display-role");
+    const stageEl = document.getElementById("user-display-stage");
+    const initialsEl = document.getElementById("user-avatar-initials");
+
+    if (nameEl) nameEl.innerText = currentUser.full_name || currentUser.username;
+    if (roleEl) {
+        roleEl.innerText = currentUser.role;
+        roleEl.className = currentUser.role === "ADMIN" 
+            ? "text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold"
+            : "text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold";
+    }
+    if (stageEl) stageEl.innerText = currentUser.assigned_stage || "Área General";
+    if (initialsEl) {
+        const parts = (currentUser.full_name || currentUser.username).split(" ");
+        initialsEl.innerText = parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase();
+    }
+}
+
+function applyRolePermissions() {
+    if (!currentUser) return;
+    const adminElements = document.querySelectorAll(".admin-only");
+    if (currentUser.role === "ADMIN") {
+        adminElements.forEach(el => el.classList.remove("hidden"));
+    } else {
+        adminElements.forEach(el => el.classList.add("hidden"));
+        switchTab("mycases");
+    }
+}
+
+async function handleLoginSubmit(e) {
+    e.preventDefault();
+    const uname = document.getElementById("login-username").value.trim();
+    const pwd = document.getElementById("login-password").value;
+    const alertEl = document.getElementById("login-error-alert");
+    const textEl = document.getElementById("login-error-text");
+
+    if (alertEl) alertEl.classList.add("hidden");
+
+    try {
+        const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: uname, password: pwd })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            currentUser = data.user;
+            currentToken = data.token;
+            localStorage.setItem("ips_user", JSON.stringify(currentUser));
+            localStorage.setItem("ips_token", currentToken);
+            hideLoginModal();
+            renderUserBadge();
+            applyRolePermissions();
+            loadAllData();
+        } else {
+            if (alertEl) {
+                alertEl.classList.remove("hidden");
+                textEl.innerText = data.detail || "Credenciales inválidas.";
+            }
+        }
+    } catch (err) {
+        if (alertEl) {
+            alertEl.classList.remove("hidden");
+            textEl.innerText = "Error al conectar con el servidor.";
+        }
+    }
+}
+
+function quickLogin(username, password) {
+    document.getElementById("login-username").value = username;
+    document.getElementById("login-password").value = password;
+    const form = document.querySelector("#login-modal form");
+    if (form) form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+}
+
+async function doLogout() {
+    try {
+        await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: currentToken })
+        });
+    } catch (e) {}
+    localStorage.removeItem("ips_user");
+    localStorage.removeItem("ips_token");
+    currentUser = null;
+    currentToken = null;
+    showLoginModal();
+}
+
+function loadAllData() {
+    loadStats();
+    loadMyCases();
+    loadCases();
+    loadStoppedCases();
+    loadBottlenecks();
+    if (currentUser && currentUser.role === "ADMIN") {
+        loadUsers();
+        loadEmails();
+        loadSenders();
+        loadRules();
+        loadLogs();
+    }
+}
 
 async function loadStats() {
     try {
@@ -351,19 +491,29 @@ async function loadLogs() {
 
 function switchTab(tabName) {
     document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
-    document.getElementById(`tab-${tabName}`).classList.remove("hidden");
+    const target = document.getElementById(`tab-${tabName}`);
+    if (target) target.classList.remove("hidden");
 
     document.querySelectorAll("[id^='tab-btn-']").forEach(btn => {
         btn.className = "tab-inactive py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2";
     });
-    document.getElementById(`tab-btn-${tabName}`).className = "tab-active py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2";
+    const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+    if (activeBtn) {
+        activeBtn.className = "tab-active py-3 text-sm font-semibold border-b-2 transition-all flex items-center space-x-2";
+    }
 
-    if (tabName === 'config') {
-        loadFullConfig();
+    if (tabName === 'mycases') {
+        loadMyCases();
+    } else if (tabName === 'stopped') {
+        loadStoppedCases();
+    } else if (tabName === 'users') {
+        loadUsers();
     } else if (tabName === 'cases') {
         loadCases();
     } else if (tabName === 'bottlenecks') {
         loadBottlenecks();
+    } else if (tabName === 'config') {
+        loadFullConfig();
     }
 }
 
@@ -758,11 +908,366 @@ async function submitProblemAction() {
             openCaseModal(currentSelectedCaseId);
             loadCases();
             loadBottlenecks();
+            loadMyCases();
+            loadStoppedCases();
         } else {
             alert("Error: " + data.detail);
         }
     } catch (e) {
         alert("Error al reportar el problema.");
+    }
+}
+
+// --- OPERATOR & CASE ADVANCE / NOVELTY FUNCTIONS ---
+
+async function loadMyCases() {
+    if (!currentUser) return;
+    try {
+        let url = "/api/cases";
+        if (currentUser.role !== "ADMIN" && currentUser.assigned_stage !== "TODAS") {
+            url += `?stage=${encodeURIComponent(currentUser.assigned_stage)}`;
+        }
+        const res = await fetch(url);
+        const cases = await res.json();
+
+        const myPending = cases.filter(c => c.status !== "COMPLETADO");
+        const badge = document.getElementById("badge-mycases-count");
+        if (badge) badge.innerText = myPending.length;
+
+        const tbody = document.getElementById("mycases-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        if (cases.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay pacientes asignados actualmente para su área.</td></tr>`;
+            return;
+        }
+
+        cases.forEach(c => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-700/40 transition-colors border-b border-slate-700/40";
+
+            let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">⏳ EN PROCESO</span>`;
+            if (c.status === "DETENIDO_PROBLEMA") {
+                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">🚨 NOVEDAD DETENIDA</span>`;
+            } else if (c.status === "COMPLETADO") {
+                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✅ COMPLETADO</span>`;
+            }
+
+            const canAct = (c.status === "EN_PROCESO");
+
+            tr.innerHTML = `
+                <td class="p-3">
+                    <span class="font-mono font-bold text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">${c.case_code}</span>
+                </td>
+                <td class="p-3">
+                    <div class="font-bold text-white">${c.patient_name || 'Paciente'}</div>
+                    <div class="text-[11px] text-slate-400">${c.patient_id_doc || 'Doc en orden'}</div>
+                </td>
+                <td class="p-3">
+                    <div class="text-slate-200 font-semibold">${c.patient_address || 'Dirección en historia'}</div>
+                    <div class="text-[11px] text-cyan-400">${c.city_zone || 'Zona Domiciliaria'}</div>
+                </td>
+                <td class="p-3">
+                    <div class="text-indigo-300 font-bold">${c.eps_name || 'EPS Subsidiado/Contributivo'}</div>
+                    <div class="text-[11px] text-slate-400">${c.service_requested || 'Atención Domiciliaria Integral'}</div>
+                </td>
+                <td class="p-3">
+                    <div class="font-bold text-emerald-300">${c.current_step_name || 'Admisiones'}</div>
+                    <div class="text-[11px] text-slate-400">${c.current_assigned_email}</div>
+                </td>
+                <td class="p-3">${statusBadge}</td>
+                <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
+                    ${canAct ? `
+                    <button onclick="quickApproveCase(${c.id}, '${c.case_code}')" title="Aprobar y pasar a siguiente usuario" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs shadow-sm transition-all">
+                        <i class="fa-solid fa-check mr-1"></i> Aprobar
+                    </button>
+                    <button onclick="openQuickRejectModal(${c.id}, '${c.case_code}', '${(c.patient_name || '').replace(/'/g, "\\'")}')" title="Reportar novedad / desaprobar" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs shadow-sm transition-all">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Desaprobar
+                    </button>
+                    ` : ''}
+                    <button onclick="openCaseModal(${c.id})" class="bg-indigo-600/60 hover:bg-indigo-600 text-slate-200 font-semibold px-2.5 py-1.5 rounded-lg text-xs transition-all">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Error loading my cases:", e);
+    }
+}
+
+async function quickApproveCase(caseId, caseCode) {
+    const comments = prompt(`Aprobar y avanzar caso ${caseCode}:\nIngrese observaciones o confirmación de la diligencia realizada:`, "Diligencia realizada conforme. Avanza a siguiente etapa.");
+    if (comments === null) return;
+
+    try {
+        const res = await fetch(`/api/cases/${caseId}/advance`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                actor_email: currentUser ? currentUser.email : "",
+                comments: comments || "Aprobado conforme"
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`✅ Caso ${caseCode} aprobado y enviado a: ${data.current_step_name || 'Completado'}`);
+            loadMyCases();
+            loadCases();
+            loadStats();
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Error al avanzar el caso.");
+    }
+}
+
+function openQuickRejectModal(caseId, caseCode, patientName) {
+    currentRejectCaseId = caseId;
+    document.getElementById("quick-reject-code").innerText = caseCode;
+    document.getElementById("quick-reject-patient").innerText = patientName;
+    document.getElementById("quick-reject-reason").value = "";
+    document.getElementById("quick-reject-modal").classList.remove("hidden");
+}
+
+function closeQuickRejectModal() {
+    document.getElementById("quick-reject-modal").classList.add("hidden");
+    currentRejectCaseId = null;
+}
+
+async function submitQuickRejectModal() {
+    if (!currentRejectCaseId) return;
+    const reason = document.getElementById("quick-reject-reason").value.trim();
+    const category = document.getElementById("quick-reject-category").value;
+
+    if (!reason) {
+        alert("Debe detallar el motivo por el cual no se acepta o se detiene el caso.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/cases/${currentRejectCaseId}/problem`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                actor_email: currentUser ? currentUser.email : "",
+                reason: reason,
+                bottleneck_category: category
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`🚨 Novedad registrada. Se notificó inmediatamente a la Coordinación (${data.alert_sent_to}) para subsanación.`);
+            closeQuickRejectModal();
+            loadMyCases();
+            loadCases();
+            loadStoppedCases();
+            loadBottlenecks();
+            loadStats();
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Error al reportar la novedad.");
+    }
+}
+
+// --- STOPPED CASES & RESOLUTION FUNCTIONS (ADMIN) ---
+
+async function loadStoppedCases() {
+    try {
+        const res = await fetch("/api/cases?status=DETENIDO_PROBLEMA");
+        const stopped = await res.json();
+
+        const badge = document.getElementById("badge-stopped-count");
+        if (badge) badge.innerText = stopped.length;
+
+        const tbody = document.getElementById("stopped-cases-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        if (stopped.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">🎉 No hay casos detenidos en este momento. Todos los pacientes avanzan sin novedad.</td></tr>`;
+            return;
+        }
+
+        stopped.forEach(c => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-700/40 transition-colors border-b border-slate-700/40 bg-rose-950/15";
+            tr.innerHTML = `
+                <td class="p-3 font-mono font-bold text-cyan-400">${c.case_code}</td>
+                <td class="p-3">
+                    <div class="font-bold text-white">${c.patient_name}</div>
+                    <div class="text-[11px] text-slate-400">${c.patient_id_doc || ''}</div>
+                </td>
+                <td class="p-3">
+                    <div class="font-bold text-rose-300">${c.current_step_name}</div>
+                    <div class="text-[11px] text-slate-400">${c.current_assigned_email}</div>
+                </td>
+                <td class="p-3 font-bold text-amber-300">${c.bottleneck_reason || 'Inconsistencia'}</td>
+                <td class="p-3 text-rose-200 text-xs font-semibold max-w-xs">${c.last_problem_reported || '-'}</td>
+                <td class="p-3 text-center font-bold text-rose-400">${c.total_returns}</td>
+                <td class="p-3 text-right">
+                    <button onclick="openResolveModal(${c.id}, '${c.case_code}', '${(c.patient_name || '').replace(/'/g, "\\'")}', '${(c.last_problem_reported || '').replace(/'/g, "\\'")}')" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-md transition-all">
+                        <i class="fa-solid fa-wrench mr-1"></i> Subsanar & Reanudar
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Error loading stopped cases:", e);
+    }
+}
+
+function openResolveModal(caseId, caseCode, patientName, problemReason) {
+    currentResolveCaseId = caseId;
+    document.getElementById("resolve-modal-code").innerText = caseCode;
+    document.getElementById("resolve-modal-patient").innerText = patientName;
+    document.getElementById("resolve-modal-problem").innerText = problemReason;
+    document.getElementById("resolve-modal-notes").value = "";
+    document.getElementById("resolve-modal").classList.remove("hidden");
+}
+
+function closeResolveModal() {
+    document.getElementById("resolve-modal").classList.add("hidden");
+    currentResolveCaseId = null;
+}
+
+async function submitResolveModal() {
+    if (!currentResolveCaseId) return;
+    const notes = document.getElementById("resolve-modal-notes").value.trim();
+    if (!notes) {
+        alert("Por favor detalle la acción correctiva realizada para subsanar la novedad.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/cases/${currentResolveCaseId}/resolve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                resolved_by: currentUser ? currentUser.email : "coordinacion@ipsdomiciliaria.com",
+                resolution_notes: notes
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`✅ ${data.message} El caso regresa a ${data.current_step_name} para continuar el proceso.`);
+            closeResolveModal();
+            loadStoppedCases();
+            loadMyCases();
+            loadCases();
+            loadBottlenecks();
+            loadStats();
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Error al resolver la novedad.");
+    }
+}
+
+// --- USER MANAGEMENT FUNCTIONS (ADMIN) ---
+
+async function loadUsers() {
+    try {
+        const res = await fetch("/api/users");
+        const users = await res.json();
+        const tbody = document.getElementById("users-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        users.forEach(u => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-slate-700/40 transition-colors border-b border-slate-700/40";
+            const roleBadge = u.role === "ADMIN" 
+                ? `<span class="bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px] border border-indigo-500/30">ADMINISTRADOR</span>`
+                : `<span class="bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-500/30">OPERADOR</span>`;
+
+            tr.innerHTML = `
+                <td class="p-3 font-mono font-bold text-white">${u.username}</td>
+                <td class="p-3 font-semibold text-slate-200">${u.full_name}</td>
+                <td class="p-3">${roleBadge}</td>
+                <td class="p-3 font-bold text-cyan-300">${u.assigned_stage}</td>
+                <td class="p-3 text-slate-300">${u.email}</td>
+                <td class="p-3 text-slate-400">${u.phone || '-'}</td>
+                <td class="p-3"><span class="text-emerald-400 font-bold">Activo</span></td>
+                <td class="p-3 text-right">
+                    <button onclick="deleteUser(${u.id}, '${u.username}')" class="text-rose-400 hover:text-rose-300 p-1" title="Eliminar usuario">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Error loading users:", e);
+    }
+}
+
+function openCreateUserModal() {
+    document.getElementById("user-modal-id").value = "";
+    document.getElementById("user-modal-username").value = "";
+    document.getElementById("user-modal-password").value = "";
+    document.getElementById("user-modal-fullname").value = "";
+    document.getElementById("user-modal-email").value = "";
+    document.getElementById("user-modal-phone").value = "";
+    document.getElementById("user-modal").classList.remove("hidden");
+}
+
+function closeUserModal() {
+    document.getElementById("user-modal").classList.add("hidden");
+}
+
+async function submitUserModal() {
+    const payload = {
+        username: document.getElementById("user-modal-username").value.trim(),
+        password: document.getElementById("user-modal-password").value,
+        full_name: document.getElementById("user-modal-fullname").value.trim(),
+        email: document.getElementById("user-modal-email").value.trim(),
+        role: document.getElementById("user-modal-role").value,
+        assigned_stage: document.getElementById("user-modal-stage").value,
+        phone: document.getElementById("user-modal-phone").value.trim()
+    };
+    if (!payload.username || !payload.password || !payload.full_name || !payload.email) {
+        alert("Todos los campos obligatorios deben ser diligenciados.");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert("✅ Usuario de la IPS registrado exitosamente.");
+            closeUserModal();
+            loadUsers();
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Error al registrar usuario.");
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`¿Está seguro de eliminar al usuario '${username}'?`)) return;
+    try {
+        const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+        if (res.ok) {
+            loadUsers();
+        } else {
+            alert("No se pudo eliminar el usuario.");
+        }
+    } catch (e) {
+        alert("Error de conexión al eliminar.");
     }
 }
 

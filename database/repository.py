@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import settings
 from .models import (
     Sender, EmailMessage, CustomRule, ActivityLog, UserCorrection,
-    WorkflowDefinition, CaseTicket, CaseHistoryLog
+    WorkflowDefinition, CaseTicket, CaseHistoryLog, UserAccount
 )
 
 logger = logging.getLogger(__name__)
@@ -325,6 +325,10 @@ class Repository:
             initial_email_id=case_data.get("initial_email_id"),
             patient_name=case_data.get("patient_name", ""),
             patient_id_doc=case_data.get("patient_id_doc", ""),
+            patient_address=case_data.get("patient_address", ""),
+            city_zone=case_data.get("city_zone", ""),
+            eps_name=case_data.get("eps_name", ""),
+            service_requested=case_data.get("service_requested", ""),
             subject=case_data.get("subject", ""),
             summary=case_data.get("summary", ""),
             target_folder=case_data.get("target_folder", "General"),
@@ -386,14 +390,20 @@ class Repository:
         db: AsyncSession,
         status: Optional[str] = None,
         folder: Optional[str] = None,
+        assigned_email: Optional[str] = None,
+        stage: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Lists cases with metadata and summary of logs."""
+        """Lists cases with metadata and summary of logs, supporting operator filters."""
         stmt = select(CaseTicket).order_by(CaseTicket.updated_at.desc())
         if status:
             stmt = stmt.where(CaseTicket.status == status)
         if folder:
             stmt = stmt.where(CaseTicket.target_folder == folder)
+        if assigned_email:
+            stmt = stmt.where(CaseTicket.current_assigned_email == assigned_email)
+        if stage and stage != "TODAS":
+            stmt = stmt.where(CaseTicket.current_step_name.ilike(f"%{stage}%"))
         stmt = stmt.limit(limit)
         result = await db.execute(stmt)
         cases = list(result.scalars().all())
@@ -407,6 +417,10 @@ class Repository:
                 "thread_id": c.thread_id,
                 "patient_name": c.patient_name,
                 "patient_id_doc": c.patient_id_doc,
+                "patient_address": c.patient_address or "",
+                "city_zone": c.city_zone or "",
+                "eps_name": c.eps_name or "",
+                "service_requested": c.service_requested or "",
                 "subject": c.subject,
                 "summary": c.summary,
                 "target_folder": c.target_folder,
@@ -419,6 +433,8 @@ class Repository:
                 "total_returns": c.total_returns,
                 "last_problem_reported": c.last_problem_reported,
                 "bottleneck_reason": c.bottleneck_reason,
+                "resolution_notes": c.resolution_notes or "",
+                "resolved_by": c.resolved_by or "",
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
                 "completed_at": c.completed_at.isoformat() if c.completed_at else None,
@@ -445,6 +461,10 @@ class Repository:
             "thread_id": case.thread_id,
             "patient_name": case.patient_name,
             "patient_id_doc": case.patient_id_doc,
+            "patient_address": case.patient_address or "",
+            "city_zone": case.city_zone or "",
+            "eps_name": case.eps_name or "",
+            "service_requested": case.service_requested or "",
             "subject": case.subject,
             "summary": case.summary,
             "target_folder": case.target_folder,
@@ -457,6 +477,8 @@ class Repository:
             "total_returns": case.total_returns,
             "last_problem_reported": case.last_problem_reported,
             "bottleneck_reason": case.bottleneck_reason,
+            "resolution_notes": case.resolution_notes or "",
+            "resolved_by": case.resolved_by or "",
             "created_at": case.created_at.isoformat() if case.created_at else None,
             "updated_at": case.updated_at.isoformat() if case.updated_at else None,
             "completed_at": case.completed_at.isoformat() if case.completed_at else None,
@@ -530,4 +552,178 @@ class Repository:
             "bottlenecks_by_reason": bottlenecks_by_reason,
             "delayed_cases": delayed_cases
         }
+
+    # ================= USER ACCOUNT & RESOLUTION MANAGEMENT =================
+    @staticmethod
+    async def get_user_by_username(db: AsyncSession, username: str) -> Optional[UserAccount]:
+        stmt = select(UserAccount).where(UserAccount.username == username.strip().lower())
+        res = await db.execute(stmt)
+        return res.scalar_one_or_none()
+
+    @staticmethod
+    async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[UserAccount]:
+        stmt = select(UserAccount).where(UserAccount.id == user_id)
+        res = await db.execute(stmt)
+        return res.scalar_one_or_none()
+
+    @staticmethod
+    async def get_all_users(db: AsyncSession) -> List[Dict[str, Any]]:
+        stmt = select(UserAccount).order_by(UserAccount.id.asc())
+        res = await db.execute(stmt)
+        users = list(res.scalars().all())
+        return [
+            {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "email": u.email,
+                "role": u.role,
+                "assigned_stage": u.assigned_stage,
+                "phone": u.phone,
+                "is_active": u.is_active,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+                "last_login": u.last_login.isoformat() if u.last_login else None
+            }
+            for u in users
+        ]
+
+    @staticmethod
+    async def create_user(
+        db: AsyncSession,
+        username: str,
+        password: str,
+        full_name: str,
+        email: str,
+        role: str = "OPERADOR",
+        assigned_stage: str = "TODAS",
+        phone: str = ""
+    ) -> UserAccount:
+        from backend.services.auth import AuthService
+        pwd_hash, salt = AuthService.hash_password(password)
+        user = UserAccount(
+            username=username.strip().lower(),
+            password_hash=pwd_hash,
+            salt=salt,
+            full_name=full_name.strip(),
+            email=email.strip().lower(),
+            role=role.upper(),
+            assigned_stage=assigned_stage,
+            phone=phone,
+            is_active=True
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    @staticmethod
+    async def update_user(
+        db: AsyncSession,
+        user_id: int,
+        user_data: Dict[str, Any]
+    ) -> Optional[UserAccount]:
+        from backend.services.auth import AuthService
+        user = await Repository.get_user_by_id(db, user_id)
+        if not user:
+            return None
+        if "full_name" in user_data:
+            user.full_name = user_data["full_name"]
+        if "email" in user_data:
+            user.email = user_data["email"].strip().lower()
+        if "role" in user_data:
+            user.role = user_data["role"].upper()
+        if "assigned_stage" in user_data:
+            user.assigned_stage = user_data["assigned_stage"]
+        if "phone" in user_data:
+            user.phone = user_data["phone"]
+        if "is_active" in user_data:
+            user.is_active = bool(user_data["is_active"])
+        if "password" in user_data and user_data["password"]:
+            pwd_hash, salt = AuthService.hash_password(user_data["password"])
+            user.password_hash = pwd_hash
+            user.salt = salt
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    @staticmethod
+    async def delete_user(db: AsyncSession, user_id: int) -> bool:
+        user = await Repository.get_user_by_id(db, user_id)
+        if not user:
+            return False
+        await db.delete(user)
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def seed_default_users(db: AsyncSession) -> None:
+        """Seeds default clinical and operational users for the Home Care IPS."""
+        from backend.services.auth import AuthService
+        stmt = select(func.count(UserAccount.id))
+        count = (await db.execute(stmt)).scalar() or 0
+        if count > 0:
+            return
+
+        default_users = [
+            ("admin", "admin123", "Dr. Coordinador General IPS", "coordinacion@ipsdomiciliaria.com", "ADMIN", "TODAS", "3001234567"),
+            ("admisiones", "adm123", "Lic. Carlos Ruiz (Admisiones Domiciliarias)", "admisiones@ipsdomiciliaria.com", "OPERADOR", "Admisiones", "3109876543"),
+            ("auditoria", "aud123", "Dra. Elena Ramos (Auditoría Médica)", "auditoria@ipsdomiciliaria.com", "OPERADOR", "Auditoría Médica", "3154567890"),
+            ("logistica", "log123", "Ing. Mario Restrepo (Logística, Rutas y Equipos)", "logistica@ipsdomiciliaria.com", "OPERADOR", "Logística y Asignación de Rutas", "3206543210"),
+            ("camas", "camas123", "Gestor de Asignación y Equipos Clínicos", "camas@clinica.com", "OPERADOR", "Asignación de Camas", "3112223344"),
+        ]
+        for uname, pwd, name, mail, role, stage, phone in default_users:
+            pwd_hash, salt = AuthService.hash_password(pwd)
+            u = UserAccount(
+                username=uname,
+                password_hash=pwd_hash,
+                salt=salt,
+                full_name=name,
+                email=mail,
+                role=role,
+                assigned_stage=stage,
+                phone=phone,
+                is_active=True
+            )
+            db.add(u)
+        await db.commit()
+        logger.info("[Repository] Seeded default IPS Domiciliaria user accounts.")
+
+    @staticmethod
+    async def resolve_case_problem(
+        db: AsyncSession,
+        case_id: int,
+        resolved_by: str,
+        resolution_notes: str,
+        resume_step_number: Optional[int] = None
+    ) -> Optional[CaseTicket]:
+        """
+        Unblocks a stopped case.
+        Administrator inputs the corrective resolution and resumes the case.
+        """
+        stmt = select(CaseTicket).options(selectinload(CaseTicket.workflow_rel)).where(CaseTicket.id == case_id)
+        res = await db.execute(stmt)
+        case = res.scalar_one_or_none()
+        if not case:
+            return None
+
+        case.status = "EN_PROCESO"
+        case.resolution_notes = resolution_notes
+        case.resolved_by = resolved_by
+        case.resolved_at = datetime.utcnow()
+        case.updated_at = datetime.utcnow()
+        if resume_step_number and resume_step_number > 0:
+            case.current_step_number = resume_step_number
+
+        await Repository.log_case_event(
+            db,
+            case_id=case.id,
+            step_number=case.current_step_number,
+            step_name=case.current_step_name,
+            actor_email=resolved_by,
+            action="NOVEDAD_RESUELTA",
+            comments=f"Novedad resuelta por Supervisor ({resolved_by}): {resolution_notes}. Caso reanudado para continuar el flujo."
+        )
+        await db.commit()
+        await db.refresh(case)
+        return case
 
