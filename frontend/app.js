@@ -1213,6 +1213,8 @@ async function submitResolveModal() {
 
 // --- USER MANAGEMENT FUNCTIONS (ADMIN) ---
 
+let currentLoadedUsers = [];
+
 async function loadUsers() {
     const tbody = document.getElementById("users-table-body");
     if (!tbody) return;
@@ -1232,9 +1234,10 @@ async function loadUsers() {
             return;
         }
         const users = await res.json();
+        currentLoadedUsers = Array.isArray(users) ? users : [];
         tbody.innerHTML = "";
 
-        if (!Array.isArray(users) || users.length === 0) {
+        if (currentLoadedUsers.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="8" class="p-6 text-center text-slate-400">
@@ -1246,12 +1249,22 @@ async function loadUsers() {
             return;
         }
 
-        users.forEach(u => {
+        currentLoadedUsers.forEach(u => {
             const tr = document.createElement("tr");
-            tr.className = "hover:bg-slate-700/40 transition-colors border-b border-slate-700/40";
+            tr.className = `hover:bg-slate-700/40 transition-colors border-b border-slate-700/40 ${!u.is_active ? 'opacity-60 bg-slate-900/30' : ''}`;
             const roleBadge = u.role === "ADMIN" 
                 ? `<span class="bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px] border border-indigo-500/30">ADMINISTRADOR</span>`
                 : `<span class="bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-500/30">OPERADOR</span>`;
+
+            const statusBadge = u.is_active 
+                ? `<button onclick="toggleUserStatus(${u.id}, '${u.username}')" title="Clic para Inactivar / Suspender" class="bg-emerald-500/20 hover:bg-amber-500/20 text-emerald-300 hover:text-amber-300 border border-emerald-500/40 hover:border-amber-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1.5 transition-all cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Activo</span>
+                   </button>`
+                : `<button onclick="toggleUserStatus(${u.id}, '${u.username}')" title="Clic para Activar / Habilitar" class="bg-rose-500/20 hover:bg-emerald-500/20 text-rose-300 hover:text-emerald-300 border border-rose-500/40 hover:border-emerald-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1.5 transition-all cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                    <span>Inactivo</span>
+                   </button>`;
 
             tr.innerHTML = `
                 <td class="p-3 font-mono font-bold text-white">${u.username}</td>
@@ -1260,9 +1273,17 @@ async function loadUsers() {
                 <td class="p-3 font-bold text-cyan-300">${u.assigned_stage}</td>
                 <td class="p-3 text-slate-300">${u.email}</td>
                 <td class="p-3 text-slate-400">${u.phone || '-'}</td>
-                <td class="p-3"><span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i>Activo</span></td>
-                <td class="p-3 text-right">
-                    <button onclick="deleteUser(${u.id}, '${u.username}')" class="text-rose-400 hover:text-rose-300 p-1" title="Eliminar usuario">
+                <td class="p-3">${statusBadge}</td>
+                <td class="p-3 text-right whitespace-nowrap">
+                    <button onclick="openEditUserModal(${u.id})" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2 py-1 rounded-lg text-xs font-semibold border border-indigo-500/30 transition-all mr-1.5" title="Editar datos del usuario">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        <span class="hidden sm:inline ml-1">Editar</span>
+                    </button>
+                    <button onclick="toggleUserStatus(${u.id}, '${u.username}')" class="${u.is_active ? 'bg-amber-500/20 hover:bg-amber-600 text-amber-300 hover:text-white border-amber-500/30' : 'bg-emerald-500/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border-emerald-500/30'} px-2 py-1 rounded-lg text-xs font-semibold border transition-all mr-1.5" title="${u.is_active ? 'Suspender acceso a este usuario' : 'Habilitar acceso'}">
+                        <i class="fa-solid ${u.is_active ? 'fa-user-slash' : 'fa-user-check'}"></i>
+                        <span class="hidden sm:inline ml-1">${u.is_active ? 'Inactivar' : 'Activar'}</span>
+                    </button>
+                    <button onclick="deleteUser(${u.id}, '${u.username}')" class="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white px-2 py-1 rounded-lg text-xs font-semibold border border-rose-500/30 transition-all" title="Eliminar usuario definitivamente">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -1284,20 +1305,77 @@ function openCreateUserModal() {
         return;
     }
     document.getElementById("user-modal-id").value = "";
-    document.getElementById("user-modal-username").value = "";
-    document.getElementById("user-modal-password").value = "";
+    document.getElementById("user-modal-title-text").innerText = "Registrar Usuario de la IPS";
+    document.getElementById("user-modal-btn-text").innerText = "Guardar Usuario";
+
+    const unameInput = document.getElementById("user-modal-username");
+    unameInput.value = "";
+    unameInput.readOnly = false;
+    unameInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white";
+
+    const pwdInput = document.getElementById("user-modal-password");
+    pwdInput.value = "";
+    pwdInput.placeholder = "••••••••";
+    const pwdHint = document.getElementById("user-modal-pwd-hint");
+    if (pwdHint) pwdHint.classList.add("hidden");
+
     document.getElementById("user-modal-fullname").value = "";
     document.getElementById("user-modal-email").value = "";
     document.getElementById("user-modal-phone").value = "";
+    document.getElementById("user-modal-role").value = "OPERADOR";
+    document.getElementById("user-modal-stage").value = "Admisiones";
+    document.getElementById("user-modal-status").value = "true";
+
     modal.classList.remove("hidden");
+    modal.style.display = "flex";
+}
+
+function openEditUserModal(userId) {
+    const user = currentLoadedUsers.find(u => u.id === userId);
+    if (!user) {
+        alert("No se encontró la información del usuario seleccionado.");
+        return;
+    }
+
+    const modal = document.getElementById("user-modal");
+    if (!modal) return;
+
+    document.getElementById("user-modal-id").value = user.id;
+    document.getElementById("user-modal-title-text").innerText = `Editar Usuario: ${user.username}`;
+    document.getElementById("user-modal-btn-text").innerText = "Actualizar Cambios";
+
+    const unameInput = document.getElementById("user-modal-username");
+    unameInput.value = user.username;
+    unameInput.readOnly = true;
+    unameInput.className = "w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-slate-400 cursor-not-allowed";
+
+    const pwdInput = document.getElementById("user-modal-password");
+    pwdInput.value = "";
+    pwdInput.placeholder = "•••••••• (Sin cambios)";
+    const pwdHint = document.getElementById("user-modal-pwd-hint");
+    if (pwdHint) pwdHint.classList.remove("hidden");
+
+    document.getElementById("user-modal-fullname").value = user.full_name || "";
+    document.getElementById("user-modal-email").value = user.email || "";
+    document.getElementById("user-modal-phone").value = user.phone || "";
+    document.getElementById("user-modal-role").value = user.role || "OPERADOR";
+    document.getElementById("user-modal-stage").value = user.assigned_stage || "TODAS";
+    document.getElementById("user-modal-status").value = user.is_active ? "true" : "false";
+
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
 }
 
 function closeUserModal() {
     const modal = document.getElementById("user-modal");
-    if (modal) modal.classList.add("hidden");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+    }
 }
 
 async function submitUserModal() {
+    const userId = document.getElementById("user-modal-id").value;
     const uname = document.getElementById("user-modal-username").value.trim();
     const pwd = document.getElementById("user-modal-password").value;
     const fname = document.getElementById("user-modal-fullname").value.trim();
@@ -1305,46 +1383,110 @@ async function submitUserModal() {
     const role = document.getElementById("user-modal-role").value;
     const stage = document.getElementById("user-modal-stage").value;
     const phone = document.getElementById("user-modal-phone").value.trim();
+    const isActive = document.getElementById("user-modal-status").value === "true";
 
-    if (!uname || !pwd || !fname || !email) {
-        alert("Por favor diligencie todos los campos obligatorios: Nombre Completo, Usuario, Contraseña y Correo Electrónico.");
-        return;
+    if (!userId) {
+        // Mode: CREATE
+        if (!uname || !pwd || !fname || !email) {
+            alert("Por favor diligencie todos los campos obligatorios: Nombre Completo, Usuario, Contraseña y Correo Electrónico.");
+            return;
+        }
+
+        const payload = {
+            username: uname,
+            password: pwd,
+            full_name: fname,
+            email: email,
+            role: role,
+            assigned_stage: stage,
+            phone: phone
+        };
+
+        try {
+            const res = await fetch("/api/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`✅ Usuario '${uname}' (${fname}) registrado exitosamente.`);
+                closeUserModal();
+                loadUsers();
+            } else {
+                alert("Error del servidor: " + (data.detail || JSON.stringify(data)));
+            }
+        } catch (e) {
+            alert("Error de conexión al registrar usuario.");
+        }
+    } else {
+        // Mode: EDIT / UPDATE
+        if (!fname || !email) {
+            alert("El Nombre Completo y Correo Electrónico son obligatorios.");
+            return;
+        }
+
+        const payload = {
+            full_name: fname,
+            email: email,
+            role: role,
+            assigned_stage: stage,
+            phone: phone,
+            is_active: isActive
+        };
+
+        if (pwd && pwd.trim().length > 0) {
+            payload.password = pwd.trim();
+        }
+
+        try {
+            const res = await fetch(`/api/users/${userId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`✅ Datos del usuario '${uname}' actualizados correctamente.`);
+                closeUserModal();
+                loadUsers();
+            } else {
+                alert("Error al actualizar: " + (data.detail || JSON.stringify(data)));
+            }
+        } catch (e) {
+            alert("Error de conexión al actualizar usuario.");
+        }
     }
+}
 
-    const payload = {
-        username: uname,
-        password: pwd,
-        full_name: fname,
-        email: email,
-        role: role,
-        assigned_stage: stage,
-        phone: phone
-    };
+async function toggleUserStatus(userId, username) {
+    const user = currentLoadedUsers.find(u => u.id === userId);
+    const newStatusText = user && user.is_active ? "INACTIVAR" : "ACTIVAR";
+    if (!confirm(`¿Está seguro de ${newStatusText} el acceso para el usuario '${username}'?`)) return;
 
     try {
-        const res = await fetch("/api/users", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+        const res = await fetch(`/api/users/${userId}/toggle-status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" }
         });
         const data = await res.json();
         if (res.ok) {
-            alert(`✅ Usuario '${uname}' (${fname}) registrado exitosamente.`);
-            closeUserModal();
+            alert(`✅ ${data.message}`);
             loadUsers();
         } else {
-            alert("Error del servidor: " + (data.detail || JSON.stringify(data)));
+            alert("Error: " + (data.detail || "No se pudo cambiar el estado"));
         }
     } catch (e) {
-        alert("Error de conexión al registrar usuario. Asegúrese de haber reiniciado el servicio en el iMac con: sudo systemctl restart email-ai-agent");
+        alert("Error de conexión al cambiar el estado del usuario.");
     }
 }
 
 async function deleteUser(userId, username) {
-    if (!confirm(`¿Está seguro de eliminar al usuario '${username}'?`)) return;
+    if (!confirm(`⚠️ ATENCIÓN: ¿Está seguro de ELIMINAR definitivamente al usuario '${username}'? Esta acción no se puede deshacer.`)) return;
     try {
         const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
         if (res.ok) {
+            alert(`✅ Usuario '${username}' eliminado del sistema.`);
             loadUsers();
         } else {
             alert("No se pudo eliminar el usuario.");
@@ -1356,8 +1498,10 @@ async function deleteUser(userId, username) {
 
 // Ensure global scope accessibility
 window.openCreateUserModal = openCreateUserModal;
+window.openEditUserModal = openEditUserModal;
 window.closeUserModal = closeUserModal;
 window.submitUserModal = submitUserModal;
+window.toggleUserStatus = toggleUserStatus;
 window.loadUsers = loadUsers;
 window.deleteUser = deleteUser;
 window.doLogout = doLogout;

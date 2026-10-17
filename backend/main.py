@@ -721,11 +721,27 @@ async def create_user(payload: Dict[str, Any] = Body(...), db: AsyncSession = De
 
 @app.put("/api/users/{user_id}")
 async def update_user(user_id: int, payload: Dict[str, Any] = Body(...), db: AsyncSession = Depends(get_db)):
-    """Updates user information or password."""
+    """Updates user information, password or status."""
     updated = await Repository.update_user(db, user_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return {"status": "success", "message": "Usuario actualizado exitosamente"}
+
+@app.patch("/api/users/{user_id}/toggle-status")
+async def toggle_user_status(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Toggles active/inactive state for a user account."""
+    user = await Repository.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user.is_active = not user.is_active
+    await db.commit()
+    await db.refresh(user)
+    action_text = "activado" if user.is_active else "inactivado"
+    return {
+        "status": "success",
+        "message": f"Usuario {user.username} {action_text} exitosamente",
+        "is_active": user.is_active
+    }
 
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):

@@ -1001,8 +1001,8 @@
         <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 id="user-modal-title" class="font-bold text-purple-400 text-base flex items-center space-x-2">
-                    <i class="fa-solid fa-user-plus"></i>
-                    <span>Registrar Usuario de la IPS</span>
+                    <i class="fa-solid fa-users-gear text-purple-400"></i>
+                    <span id="user-modal-title-text">Registrar Usuario de la IPS</span>
                 </h3>
                 <button onclick="closeUserModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -1020,6 +1020,7 @@
                     <div>
                         <label class="block text-slate-300 font-semibold mb-1">Contraseña</label>
                         <input type="password" id="user-modal-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <p id="user-modal-pwd-hint" class="hidden text-[10px] text-amber-300 mt-0.5">En blanco = no cambiar</p>
                     </div>
                 </div>
                 <div>
@@ -1044,16 +1045,25 @@
                         </select>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-slate-300 font-semibold mb-1">Teléfono Móvil / WhatsApp</label>
-                    <input type="text" id="user-modal-phone" placeholder="300 123 4567" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Teléfono Móvil / WhatsApp</label>
+                        <input type="text" id="user-modal-phone" placeholder="300 123 4567" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Estado de la Cuenta</label>
+                        <select id="user-modal-status" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white">
+                            <option value="true">Activo (Habilitado)</option>
+                            <option value="false">Inactivo (Suspendido)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end space-x-2 pt-2 border-t border-slate-700">
                 <button onclick="closeUserModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-xl text-xs">Cancelar</button>
                 <button onclick="submitUserModal()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-md">
                     <i class="fa-solid fa-floppy-disk text-xs"></i>
-                    <span>Guardar Usuario</span>
+                    <span id="user-modal-btn-text">Guardar Usuario</span>
                 </button>
             </div>
         </div>
@@ -1103,6 +1113,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="static/app.js?v=2.5"></script>
+    <script src="static/app.js?v=2.6"></script>
 </body>
 </html>
