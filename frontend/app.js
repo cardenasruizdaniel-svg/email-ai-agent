@@ -36,10 +36,15 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initAuth() {
-    const userStr = localStorage.getItem("ips_user");
-    const token = localStorage.getItem("ips_token");
+    // Purge any legacy persistent localStorage so startup always demands login
+    localStorage.removeItem("ips_user");
+    localStorage.removeItem("ips_token");
+
+    const userStr = sessionStorage.getItem("ips_user");
+    const token = sessionStorage.getItem("ips_token");
     if (!userStr || !token) {
         showLoginModal();
+        renderUserBadge();
         return false;
     }
     try {
@@ -50,22 +55,36 @@ function initAuth() {
         return true;
     } catch (e) {
         showLoginModal();
+        renderUserBadge();
         return false;
     }
 }
 
 function showLoginModal() {
     const modal = document.getElementById("login-modal");
-    if (modal) modal.classList.remove("hidden");
+    if (modal) {
+        modal.classList.remove("hidden");
+        modal.style.display = "flex";
+    }
+    const uname = document.getElementById("login-username");
+    if (uname) uname.focus();
 }
 
 function hideLoginModal() {
     const modal = document.getElementById("login-modal");
-    if (modal) modal.classList.add("hidden");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+    }
 }
 
 function renderUserBadge() {
-    if (!currentUser) return;
+    const badge = document.getElementById("user-profile-badge");
+    if (!currentUser) {
+        if (badge) badge.classList.add("hidden");
+        return;
+    }
+    if (badge) badge.classList.remove("hidden");
     const nameEl = document.getElementById("user-display-name");
     const roleEl = document.getElementById("user-display-role");
     const stageEl = document.getElementById("user-display-stage");
@@ -115,8 +134,8 @@ async function handleLoginSubmit(e) {
         if (res.ok) {
             currentUser = data.user;
             currentToken = data.token;
-            localStorage.setItem("ips_user", JSON.stringify(currentUser));
-            localStorage.setItem("ips_token", currentToken);
+            sessionStorage.setItem("ips_user", JSON.stringify(currentUser));
+            sessionStorage.setItem("ips_token", currentToken);
             hideLoginModal();
             renderUserBadge();
             applyRolePermissions();
@@ -136,25 +155,34 @@ async function handleLoginSubmit(e) {
 }
 
 function quickLogin(username, password) {
-    document.getElementById("login-username").value = username;
-    document.getElementById("login-password").value = password;
+    const u = document.getElementById("login-username");
+    const p = document.getElementById("login-password");
+    if (u) u.value = username;
+    if (p) p.value = password;
     const form = document.querySelector("#login-modal form");
     if (form) form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
 }
 
 async function doLogout() {
     try {
-        await fetch("/api/auth/logout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: currentToken })
-        });
-    } catch (e) {}
-    localStorage.removeItem("ips_user");
-    localStorage.removeItem("ips_token");
+        if (currentToken) {
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: currentToken })
+            });
+        }
+    } catch (e) {
+        console.warn("Logout request failed:", e);
+    }
+    // Wipe all tokens and session data completely
+    localStorage.clear();
+    sessionStorage.clear();
     currentUser = null;
     currentToken = null;
-    showLoginModal();
+
+    // Reload page immediately so it starts fresh at the login screen
+    window.location.reload();
 }
 
 function loadAllData() {
@@ -1332,4 +1360,9 @@ window.closeUserModal = closeUserModal;
 window.submitUserModal = submitUserModal;
 window.loadUsers = loadUsers;
 window.deleteUser = deleteUser;
+window.doLogout = doLogout;
+window.handleLoginSubmit = handleLoginSubmit;
+window.quickLogin = quickLogin;
+window.showLoginModal = showLoginModal;
+window.hideLoginModal = hideLoginModal;
 

@@ -52,19 +52,20 @@
             </button>
 
             <!-- User Profile & Logout -->
-            <div id="user-profile-badge" class="flex items-center space-x-3 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 shadow-sm">
+            <div id="user-profile-badge" class="hidden flex items-center space-x-3 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 shadow-sm">
                 <div id="user-avatar-initials" class="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
-                    AD
+                    --
                 </div>
                 <div class="text-left text-xs">
                     <div class="font-bold text-white flex items-center space-x-1.5">
-                        <span id="user-display-name">Dr. Coordinador</span>
-                        <span id="user-display-role" class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold">ADMIN</span>
+                        <span id="user-display-name">Usuario</span>
+                        <span id="user-display-role" class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold">ROL</span>
                     </div>
-                    <div id="user-display-stage" class="text-[10px] text-slate-400">Coordinación General</div>
+                    <div id="user-display-stage" class="text-[10px] text-slate-400">Área Asignada</div>
                 </div>
-                <button onclick="doLogout()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 text-xs p-1 rounded transition-colors ml-1">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                <button onclick="doLogout()" title="Cerrar Sesión" class="bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 border border-rose-500/30 transition-all cursor-pointer ml-1">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    <span>Cerrar Sesión</span>
                 </button>
             </div>
         </div>
@@ -1100,6 +1101,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="static/app.js?v=2.3"></script>
+    <script src="static/app.js?v=2.4"></script>
 </body>
 </html>
