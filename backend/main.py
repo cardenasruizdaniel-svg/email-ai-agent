@@ -741,7 +741,10 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+    app.mount("/correos/static", StaticFiles(directory=frontend_dir), name="correos_static")
 
     @app.get("/")
+    @app.get("/correos")
+    @app.get("/correos/")
     async def serve_dashboard():
         return FileResponse(os.path.join(frontend_dir, "index.html"))

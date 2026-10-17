@@ -1,3 +1,15 @@
+// Automatically adapt API calls to work under subpaths (e.g. /correos/ or root /)
+const _origFetch = window.fetch;
+window.fetch = function(url, options) {
+    if (typeof url === 'string' && url.startsWith('/api')) {
+        const pathPrefix = window.location.pathname.replace(/\/$/, '');
+        if (pathPrefix && pathPrefix !== '') {
+            url = pathPrefix + url;
+        }
+    }
+    return _origFetch.call(this, url, options);
+};
+
 let allEmails = [];
 let currentSelectedEmailId = null;
 let currentSelectedCaseId = null;
