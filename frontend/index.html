@@ -14,7 +14,7 @@
             window.location.replace(window.location.pathname + '/' + window.location.search);
         }
     </script>
-    <link rel="stylesheet" href="static/styles.css?v=2.8">
+    <link rel="stylesheet" href="static/styles.css?v=2.9">
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
 
@@ -89,54 +89,72 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
-        <!-- Metrics Counter Grid -->
+        <!-- Metrics Counter Grid (Interactive Clickable Drilldown) -->
         <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('total')" title="Clic para ver Solicitudes de Hoy" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-indigo-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>Solicitudes Hoy</span>
+                    <span class="font-semibold group-hover:text-indigo-300">Solicitudes Hoy</span>
                     <i class="fa-solid fa-inbox text-indigo-400 text-base"></i>
                 </div>
-                <div id="stat-total" class="text-2xl font-black text-white mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-total" class="text-2xl font-black text-white">0</div>
+                    <span class="text-[10px] text-indigo-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
 
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('clasificados_ia')" title="Clic para ver Correos Clasificados por IA" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-emerald-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>Clasificados IA</span>
+                    <span class="font-semibold group-hover:text-emerald-300">Clasificados IA</span>
                     <i class="fa-solid fa-wand-magic-sparkles text-emerald-400 text-base"></i>
                 </div>
-                <div id="stat-replied" class="text-2xl font-black text-emerald-400 mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-replied" class="text-2xl font-black text-emerald-400">0</div>
+                    <span class="text-[10px] text-emerald-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
 
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('en_proceso')" title="Clic para ver Casos en Proceso de Atención" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-cyan-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>En Proceso</span>
+                    <span class="font-semibold group-hover:text-cyan-300">En Proceso</span>
                     <i class="fa-solid fa-route text-cyan-400 text-base"></i>
                 </div>
-                <div id="stat-info" class="text-2xl font-black text-cyan-400 mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-info" class="text-2xl font-black text-cyan-400">0</div>
+                    <span class="text-[10px] text-cyan-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
 
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('novedades_detenidos')" title="Clic para ver Novedades y Casos Detenidos" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-rose-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>Novedades / Detenidos</span>
+                    <span class="font-semibold group-hover:text-rose-300">Novedades / Detenidos</span>
                     <i class="fa-solid fa-circle-exclamation text-rose-400 text-base"></i>
                 </div>
-                <div id="stat-review" class="text-2xl font-black text-rose-400 mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-review" class="text-2xl font-black text-rose-400">0</div>
+                    <span class="text-[10px] text-rose-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
 
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('completados')" title="Clic para ver Casos y Solicitudes Completadas" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-emerald-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>Completados</span>
+                    <span class="font-semibold group-hover:text-emerald-300">Completados</span>
                     <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
                 </div>
-                <div id="stat-urgent" class="text-2xl font-black text-emerald-400 mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-urgent" class="text-2xl font-black text-emerald-400">0</div>
+                    <span class="text-[10px] text-emerald-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
 
-            <div class="bg-slate-800 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+            <div onclick="openMetricDrilldown('con_adjuntos')" title="Clic para ver Correos con Órdenes / Adjuntos Médicos" class="metric-kpi-card cursor-pointer bg-slate-800 hover:bg-slate-750 border border-slate-700/60 hover:border-purple-500/60 rounded-xl p-4 flex flex-col justify-between shadow-sm transition-all hover:scale-[1.02] group">
                 <div class="flex justify-between items-center text-slate-400 text-xs">
-                    <span>Con Órdenes / Adjuntos</span>
+                    <span class="font-semibold group-hover:text-purple-300">Con Órdenes / Adjuntos</span>
                     <i class="fa-solid fa-paperclip text-purple-400 text-base"></i>
                 </div>
-                <div id="stat-attach" class="text-2xl font-black text-purple-400 mt-2">0</div>
+                <div class="flex items-baseline justify-between mt-2">
+                    <div id="stat-attach" class="text-2xl font-black text-purple-400">0</div>
+                    <span class="text-[10px] text-purple-400 opacity-80 group-hover:opacity-100 flex items-center space-x-1 font-medium"><span>Ver</span><i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                </div>
             </div>
         </section>
 
@@ -667,9 +685,93 @@
                             <p class="text-[11px] text-slate-400 mt-0.5">Recibe alertas inmediatas en caso de novedades/rechazos para aplicar correctivos, y el expediente completo al culminar.</p>
                         </div>
 
+                    </div>
+
+                    <!-- FIRMA DIGITAL PERSONALIZADA & SALIENTES -->
+                    <div class="col-span-1 md:col-span-2 bg-slate-900/60 p-5 rounded-xl border border-slate-700 space-y-4">
+                        <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-700/80 pb-3">
+                            <div>
+                                <h3 class="font-bold text-purple-400 text-sm flex items-center space-x-2">
+                                    <i class="fa-solid fa-signature"></i>
+                                    <span>3. Diseñador y Generador de Firma Digital para Correos Salientes</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Configure una firma profesional y personalizada con sus datos, cargo, registro médico y cláusula legal para todos los correos y respuestas enviadas.</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[11px] text-slate-400 font-medium">Plantillas:</span>
+                                <button type="button" onclick="applySignatureTemplate('clinical')" class="px-2.5 py-1 text-[11px] rounded bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/40 transition-all font-semibold">🩺 Médico/Clínico</button>
+                                <button type="button" onclick="applySignatureTemplate('executive')" class="px-2.5 py-1 text-[11px] rounded bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/40 transition-all font-semibold">🏢 Institucional</button>
+                                <button type="button" onclick="applySignatureTemplate('simple')" class="px-2.5 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-all font-semibold">⚡ Simple</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Nombre del Profesional / Emisor</label>
+                                <input type="text" id="cfg-sig-name" oninput="updateSignatureLivePreview()" placeholder="Dra. Claudia Morales" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Cargo / Especialidad</label>
+                                <input type="text" id="cfg-sig-role" oninput="updateSignatureLivePreview()" placeholder="Coordinación Médica Domiciliaria" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Institución / Empresa</label>
+                                <input type="text" id="cfg-sig-institution" oninput="updateSignatureLivePreview()" placeholder="IPS Atención Domiciliaria" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Registro Médico / Tarjeta Profesional</label>
+                                <input type="text" id="cfg-sig-registration" oninput="updateSignatureLivePreview()" placeholder="R.M. No. 45892 - Antioquia" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Teléfono / WhatsApp de Contacto</label>
+                                <input type="text" id="cfg-sig-phone" oninput="updateSignatureLivePreview()" placeholder="+57 (604) 444-5566 / 300 123 4567" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Lema / Portal Web</label>
+                                <input type="text" id="cfg-sig-web" oninput="updateSignatureLivePreview()" placeholder="www.ipsdomiciliaria.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white">
+                            </div>
+                        </div>
+
                         <div>
-                            <label class="block text-slate-400 mb-1">Firma para Correos Salientes</label>
-                            <textarea id="cfg-signature" rows="2" placeholder="Atentamente,\nGestión Automática - Sura" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-sans"></textarea>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-slate-300 font-semibold text-[11px]">Cláusula Legal de Confidencialidad & Secreto Médico</label>
+                                <label class="flex items-center space-x-1.5 text-[11px] text-slate-400 cursor-pointer">
+                                    <input type="checkbox" id="cfg-sig-include-disclaimer" onchange="updateSignatureLivePreview()" checked class="rounded border-slate-700 text-purple-600 focus:ring-0">
+                                    <span>Incluir en firma</span>
+                                </label>
+                            </div>
+                            <input type="text" id="cfg-sig-disclaimer" oninput="updateSignatureLivePreview()" placeholder="CONFIDENCIALIDAD: La información contenida en este correo está protegida por el secreto médico legal (Ley 1581)." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-[11px]">
+                        </div>
+
+                        <!-- Live Preview Card & Final Textarea -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div>
+                                <label class="block text-slate-400 font-semibold mb-1.5 text-[11px] flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-eye text-cyan-400"></i>
+                                    <span>Vista Previa de la Firma Digital (Cómo se verá en el correo)</span>
+                                </label>
+                                <div id="sig-live-preview-box" class="bg-slate-950/80 border border-slate-700 rounded-xl p-4 text-xs space-y-2 min-h-[140px] flex flex-col justify-between">
+                                    <div class="border-l-4 border-indigo-500 pl-3 space-y-0.5">
+                                        <div id="preview-sig-name" class="font-bold text-white text-sm">Dra. Claudia Morales</div>
+                                        <div id="preview-sig-role" class="text-indigo-400 text-xs font-semibold">Coordinación Médica Domiciliaria</div>
+                                        <div id="preview-sig-institution" class="text-slate-300 font-medium">IPS Atención Domiciliaria</div>
+                                        <div id="preview-sig-details" class="text-slate-400 text-[11px]">R.M. No. 45892 • Tel: +57 300 123 4567</div>
+                                    </div>
+                                    <div id="preview-sig-disclaimer" class="text-[9px] text-slate-500 pt-2 border-t border-slate-800 leading-tight italic">
+                                        CONFIDENCIALIDAD MÉDICA: La información contenida en este correo está sujeta a reserva legal y confidencialidad médica (Ley 1581).
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1.5">
+                                    <label class="text-slate-400 font-semibold text-[11px] flex items-center space-x-1.5">
+                                        <i class="fa-solid fa-code text-purple-400"></i>
+                                        <span>Texto Plano de la Firma para el Servidor de Correo</span>
+                                    </label>
+                                    <button type="button" onclick="buildAndSyncSignature()" class="text-[10px] text-purple-400 hover:text-purple-300 underline font-semibold">Regenerar desde datos</button>
+                                </div>
+                                <textarea id="cfg-signature" rows="6" placeholder="Atentamente,\nCoordinación Médica..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -685,6 +787,71 @@
         </div>
 
     </main>
+
+    <!-- MODAL: METRIC DRILLDOWN (DETALLE Y ACCIONES DE CADA BOTÓN KPI) -->
+    <div id="metric-drilldown-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-4 bg-slate-900/90 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div id="drilldown-icon-box" class="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-xl border border-indigo-500/30">
+                        <i id="drilldown-icon" class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 id="drilldown-title" class="font-bold text-white text-base">Solicitudes & Correos</h3>
+                            <span id="drilldown-badge-count" class="bg-indigo-500/20 text-indigo-300 text-xs px-2.5 py-0.5 rounded-full font-bold border border-indigo-500/30">0</span>
+                        </div>
+                        <p id="drilldown-desc" class="text-xs text-slate-400 mt-0.5">Revise los correos y casos en este estado para proceder con la acción clínica correspondiente.</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="drilldown-search" onkeyup="filterDrilldownItems()" placeholder="Buscar por paciente, asunto o código..." class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl pl-8 pr-3 py-1.5 w-48 sm:w-64 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button onclick="closeMetricDrilldown()" class="text-slate-400 hover:text-white text-lg p-1.5 rounded-lg hover:bg-slate-700/50">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table / List Content -->
+            <div class="overflow-y-auto flex-1 p-4">
+                <div id="drilldown-loading" class="text-center py-12 text-slate-400 text-xs space-y-2">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-indigo-400"></i>
+                    <p>Consultando registros...</p>
+                </div>
+                <div id="drilldown-empty" class="hidden text-center py-12 text-slate-400 text-xs space-y-2">
+                    <i class="fa-regular fa-folder-open text-3xl text-slate-600"></i>
+                    <p id="drilldown-empty-text">No se encontraron registros en esta categoría.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="drilldown-table" class="w-full text-left text-xs text-slate-300 hidden">
+                        <thead class="bg-slate-900/60 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                            <tr>
+                                <th class="p-3">Código / Fecha</th>
+                                <th class="p-3">Paciente / Remitente</th>
+                                <th class="p-3">Asunto / Solicitud</th>
+                                <th class="p-3">Estado / Etapa</th>
+                                <th class="p-3">¿Cómo Proceder?</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drilldown-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="p-3 bg-slate-900 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400">
+                <span id="drilldown-summary-info">Mostrando registros activos</span>
+                <button onclick="closeMetricDrilldown()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-1.5 rounded-xl text-xs">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- EMAIL DETAIL / APPROVAL MODAL -->
     <div id="email-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
@@ -730,7 +897,13 @@
                 </div>
 
                 <div>
-                    <h4 class="font-bold text-slate-200 mb-1">Respuesta Sugerida por la IA (Borrador):</h4>
+                    <div class="flex justify-between items-center mb-1">
+                        <h4 class="font-bold text-slate-200">Respuesta Sugerida por la IA (Borrador):</h4>
+                        <button type="button" onclick="insertSignatureIntoReply()" class="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-lg flex items-center space-x-1 transition-all" title="Adjuntar la firma digital configurada al final de la respuesta">
+                            <i class="fa-solid fa-signature text-purple-400"></i>
+                            <span>Insertar Firma Digital</span>
+                        </button>
+                    </div>
                     <textarea id="modal-draft-reply" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500 font-sans"></textarea>
                 </div>
             </div>
@@ -1103,6 +1276,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="static/app.js?v=2.8"></script>
+    <script src="static/app.js?v=2.9"></script>
 </body>
 </html>

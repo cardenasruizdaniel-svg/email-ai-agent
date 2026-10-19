@@ -160,41 +160,243 @@ class Repository:
 
     @staticmethod
     async def get_dashboard_metrics(db: AsyncSession) -> Dict[str, Any]:
-        """Calculates dashboard counter statistics."""
+        """Calculates dashboard counter statistics for IPS Clinical Operations."""
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Total received
+        # 1. Total received today (or total if none today)
+        stmt_today = select(func.count(EmailMessage.id)).where(EmailMessage.date >= today_start)
+        total_today = (await db.execute(stmt_today)).scalar() or 0
+        
         stmt_total = select(func.count(EmailMessage.id))
         total_rec = (await db.execute(stmt_total)).scalar() or 0
+        display_today = total_today if total_today > 0 else total_rec
 
-        # Auto-replied
-        stmt_replied = select(func.count(EmailMessage.id)).where(EmailMessage.status == "RESPONDIDO_IA")
+        # 2. Classified by AI
+        stmt_replied = select(func.count(EmailMessage.id)).where(
+            (EmailMessage.status == "RESPONDIDO_IA") | (EmailMessage.confidence > 0)
+        )
         total_replied = (await db.execute(stmt_replied)).scalar() or 0
 
-        # Relevant info
-        stmt_info = select(func.count(EmailMessage.id)).where(EmailMessage.category == "INFORMACION")
-        total_info = (await db.execute(stmt_info)).scalar() or 0
+        # 3. In Process Cases
+        stmt_in_process_cases = select(func.count(CaseTicket.id)).where(
+            CaseTicket.status.in_(["EN_PROCESO", "EN_APROBACION"])
+        )
+        cases_in_process = (await db.execute(stmt_in_process_cases)).scalar() or 0
+        if cases_in_process == 0:
+            stmt_pend_emails = select(func.count(EmailMessage.id)).where(EmailMessage.status == "PENDIENTE")
+            cases_in_process = (await db.execute(stmt_pend_emails)).scalar() or 0
 
-        # Require human review
-        stmt_review = select(func.count(EmailMessage.id)).where(EmailMessage.requires_human_review == True, EmailMessage.status == "PENDIENTE")
+        # 4. Stopped / Novelty Cases & Pending Review
+        stmt_stopped_cases = select(func.count(CaseTicket.id)).where(
+            CaseTicket.status.in_(["DETENIDO_PROBLEMA", "DEVUELTO"])
+        )
+        cases_stopped = (await db.execute(stmt_stopped_cases)).scalar() or 0
+
+        stmt_review = select(func.count(EmailMessage.id)).where(
+            EmailMessage.requires_human_review == True,
+            EmailMessage.status == "PENDIENTE"
+        )
         total_review = (await db.execute(stmt_review)).scalar() or 0
+        total_novedades = cases_stopped + total_review
 
-        # Urgent emails
-        stmt_urgent = select(func.count(EmailMessage.id)).where(EmailMessage.priority == "CRITICA")
-        total_urgent = (await db.execute(stmt_urgent)).scalar() or 0
+        # 5. Completed Cases
+        stmt_completed = select(func.count(CaseTicket.id)).where(CaseTicket.status == "COMPLETADO")
+        total_completed = (await db.execute(stmt_completed)).scalar() or 0
 
-        # Emails with attachments
-        stmt_attach = select(func.count(EmailMessage.id)).where(EmailMessage.attachments_info != "[]")
+        # 6. Emails with attachments / orders
+        stmt_attach = select(func.count(EmailMessage.id)).where(
+            EmailMessage.attachments_info.isnot(None),
+            EmailMessage.attachments_info != "[]",
+            EmailMessage.attachments_info != ""
+        )
         total_attach = (await db.execute(stmt_attach)).scalar() or 0
 
         return {
-            "total_received": total_rec,
+            "total_received": display_today,
+            "total_all": total_rec,
             "auto_replied": total_replied,
-            "info_relevant": total_info,
-            "pending_review": total_review,
-            "urgent": total_urgent,
+            "info_relevant": cases_in_process,
+            "in_process": cases_in_process,
+            "pending_review": total_novedades,
+            "stopped_cases": total_novedades,
+            "urgent": total_completed,
+            "completed": total_completed,
             "with_attachments": total_attach
         }
+
+    @staticmethod
+    async def get_metric_drilldown(db: AsyncSession, metric_type: str) -> List[Dict[str, Any]]:
+        """Retrieves and formats specific items corresponding to a clicked KPI metric."""
+        metric = (metric_type or "").strip().lower()
+        items = []
+
+        if metric in ["total", "solicitudes_hoy", "solicitudes"]:
+            # All incoming requests / emails
+            stmt = select(EmailMessage).order_by(EmailMessage.date.desc()).limit(60)
+            emails = (await db.execute(stmt)).scalars().all()
+            for em in emails:
+                # Find linked case if any
+                case_stmt = select(CaseTicket).where(CaseTicket.initial_email_id == em.id)
+                case = (await db.execute(case_stmt)).scalar_one_or_none()
+                
+                how = "Solicitud entrante registrada. Puede clasificarla o abrirla para diligenciar."
+                action_type = "EMAIL_DETAIL"
+                action_id = em.id
+                if case:
+                    how = f"Caso {case.case_code} en etapa: '{case.current_step_name}'. Proceda con la atención clínica."
+                    action_type = "CASE_DETAIL"
+                    action_id = case.id
+
+                items.append({
+                    "id": em.id,
+                    "code": case.case_code if case else (em.id[:10] if em.id else "--"),
+                    "title": em.subject or "Sin Asunto",
+                    "sender_or_patient": (case.patient_name if case and case.patient_name else (em.sender_name or em.sender_email)),
+                    "subtext": em.company or em.sender_email,
+                    "stage_or_status": case.current_step_name if case else em.status,
+                    "date": em.date.isoformat() if em.date else "",
+                    "attachments": json.loads(em.attachments_info or "[]"),
+                    "how_to_proceed": how,
+                    "action_type": action_type,
+                    "action_id": action_id,
+                    "action_label": "Ver Caso" if case else "Ver Correo"
+                })
+
+        elif metric in ["replied", "clasificados_ia", "clasificados"]:
+            # Emails classified or responded by AI
+            stmt = select(EmailMessage).where(
+                (EmailMessage.status == "RESPONDIDO_IA") | (EmailMessage.confidence > 0)
+            ).order_by(EmailMessage.date.desc()).limit(60)
+            emails = (await db.execute(stmt)).scalars().all()
+            for em in emails:
+                items.append({
+                    "id": em.id,
+                    "code": em.id[:10] if em.id else "--",
+                    "title": em.subject or "Sin Asunto",
+                    "sender_or_patient": em.sender_name or em.sender_email,
+                    "subtext": f"Categoría: {em.category} (Confianza: {em.confidence}%)",
+                    "stage_or_status": em.status,
+                    "date": em.date.isoformat() if em.date else "",
+                    "attachments": json.loads(em.attachments_info or "[]"),
+                    "how_to_proceed": f"IA detectó intención: '{em.intent_summary or em.category}'. Proceda a validar la respuesta emitida o editarla.",
+                    "action_type": "EMAIL_DETAIL",
+                    "action_id": em.id,
+                    "action_label": "Revisar Correo IA"
+                })
+
+        elif metric in ["info", "en_proceso", "proceso"]:
+            # Active clinical cases in process
+            stmt = select(CaseTicket).where(
+                CaseTicket.status.in_(["EN_PROCESO", "EN_APROBACION"])
+            ).order_by(CaseTicket.updated_at.desc()).limit(60)
+            cases = (await db.execute(stmt)).scalars().all()
+            for c in cases:
+                items.append({
+                    "id": c.id,
+                    "code": c.case_code,
+                    "title": c.service_requested or c.subject or "Atención Domiciliaria",
+                    "sender_or_patient": c.patient_name or "Paciente por Identificar",
+                    "subtext": f"Doc: {c.patient_id_doc or 'S/N'} • EPS: {c.eps_name or 'Particular'} • Zona: {c.city_zone or 'No especificada'}",
+                    "stage_or_status": f"Etapa: {c.current_step_name}",
+                    "date": c.created_at.isoformat() if c.created_at else "",
+                    "attachments": [],
+                    "how_to_proceed": f"El paciente está pendiente de diligenciamiento en '{c.current_step_name}'. Ingrese a la bandeja y emita el concepto correspondiente.",
+                    "action_type": "CASE_DETAIL",
+                    "action_id": c.id,
+                    "action_label": "Diligenciar Caso"
+                })
+
+        elif metric in ["review", "novedades", "detenidos", "novedades_detenidos"]:
+            # Stopped cases with problems reported + emails needing review
+            stmt_cases = select(CaseTicket).where(
+                CaseTicket.status.in_(["DETENIDO_PROBLEMA", "DEVUELTO"])
+            ).order_by(CaseTicket.updated_at.desc()).limit(40)
+            cases = (await db.execute(stmt_cases)).scalars().all()
+            for c in cases:
+                items.append({
+                    "id": c.id,
+                    "code": c.case_code,
+                    "title": f"🚨 Novedad: {c.bottleneck_reason or 'No Aceptado'}",
+                    "sender_or_patient": c.patient_name or "Paciente Domiciliario",
+                    "subtext": f"Reportado por: {c.current_step_name} • Motivo: {c.last_problem_reported or 'Sin detalle'}",
+                    "stage_or_status": "DETENIDO CON NOVEDAD",
+                    "date": c.updated_at.isoformat() if c.updated_at else "",
+                    "attachments": [],
+                    "how_to_proceed": f"Flujo detenido en {c.current_step_name}. El supervisor debe revisar la novedad, corregir el problema y reanudar el caso.",
+                    "action_type": "RESOLVE_CASE",
+                    "action_id": c.id,
+                    "action_label": "Resolver Novedad"
+                })
+
+            stmt_emails = select(EmailMessage).where(
+                EmailMessage.requires_human_review == True,
+                EmailMessage.status == "PENDIENTE"
+            ).order_by(EmailMessage.date.desc()).limit(20)
+            emails = (await db.execute(stmt_emails)).scalars().all()
+            for em in emails:
+                items.append({
+                    "id": em.id,
+                    "code": em.id[:10] if em.id else "--",
+                    "title": em.subject or "Sin Asunto",
+                    "sender_or_patient": em.sender_name or em.sender_email,
+                    "subtext": f"Riesgo: {em.risk_level} • Requiere autorización humana",
+                    "stage_or_status": "REVISIÓN PENDIENTE",
+                    "date": em.date.isoformat() if em.date else "",
+                    "attachments": json.loads(em.attachments_info or "[]"),
+                    "how_to_proceed": "El correo contiene solicitudes de riesgo o requiere aprobación expresa del supervisor antes de responder.",
+                    "action_type": "EMAIL_DETAIL",
+                    "action_id": em.id,
+                    "action_label": "Revisar Correo"
+                })
+
+        elif metric in ["urgent", "completados", "completado"]:
+            # Completed cases
+            stmt = select(CaseTicket).where(
+                CaseTicket.status == "COMPLETADO"
+            ).order_by(CaseTicket.completed_at.desc()).limit(60)
+            cases = (await db.execute(stmt)).scalars().all()
+            for c in cases:
+                items.append({
+                    "id": c.id,
+                    "code": c.case_code,
+                    "title": c.service_requested or c.subject or "Atención Domiciliaria Culminada",
+                    "sender_or_patient": c.patient_name or "Paciente Domiciliario",
+                    "subtext": f"Finalizado el: {c.completed_at.strftime('%Y-%m-%d %H:%M') if c.completed_at else 'Recientemente'} • Pases: {c.total_transitions}",
+                    "stage_or_status": "COMPLETADO",
+                    "date": c.completed_at.isoformat() if c.completed_at else "",
+                    "attachments": [],
+                    "how_to_proceed": "El expediente completó todo el ciclo clínico domiciliario y se encuentra archivado con éxito.",
+                    "action_type": "CASE_DETAIL",
+                    "action_id": c.id,
+                    "action_label": "Ver Expediente"
+                })
+
+        elif metric in ["attach", "adjuntos", "con_adjuntos", "ordenes"]:
+            # Emails with attachments (orders, medical formulas, authorization files)
+            stmt = select(EmailMessage).where(
+                EmailMessage.attachments_info.isnot(None),
+                EmailMessage.attachments_info != "[]",
+                EmailMessage.attachments_info != ""
+            ).order_by(EmailMessage.date.desc()).limit(60)
+            emails = (await db.execute(stmt)).scalars().all()
+            for em in emails:
+                att_list = json.loads(em.attachments_info or "[]")
+                items.append({
+                    "id": em.id,
+                    "code": em.id[:10] if em.id else "--",
+                    "title": em.subject or "Sin Asunto",
+                    "sender_or_patient": em.sender_name or em.sender_email,
+                    "subtext": f"Archivos ({len(att_list)}): " + ", ".join([a.get("filename", "anexo") for a in att_list[:3]]),
+                    "stage_or_status": em.status,
+                    "date": em.date.isoformat() if em.date else "",
+                    "attachments": att_list,
+                    "how_to_proceed": "Revise las órdenes médicas, fórmulas o documentos clínicos adjuntos para tramitar la admisión.",
+                    "action_type": "EMAIL_DETAIL",
+                    "action_id": em.id,
+                    "action_label": "Ver Adjuntos"
+                })
+
+        return items
 
     @staticmethod
     async def get_or_create_default_workflows(db: AsyncSession) -> List[WorkflowDefinition]:

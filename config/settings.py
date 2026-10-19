@@ -27,14 +27,22 @@ class Settings(BaseSettings):
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     
-    COMPANY_NAME: str = "Empresa ABC"
+    COMPANY_NAME: str = "IPS Atención Domiciliaria"
     AGENT_NAME: str = "Asistente Virtual IA"
-    AGENT_ROLE: str = "Gestor de Atención al Cliente"
+    AGENT_ROLE: str = "Gestor de Atención y Radicación Domiciliaria"
     SUPERVISOR_EMAIL: str = "coordinacion@clinica.com"
     COMPANY_PHONE: str = "+57 300 123 4567"
     COMPANY_HOURS: str = "Lunes a Viernes de 8:00 AM a 5:00 PM"
-    COMPANY_WEBSITE: str = "https://empresaabc.com"
-    REPLY_SIGNATURE: str = "Atentamente,\nGestión Automática - Empresa ABC"
+    COMPANY_WEBSITE: str = "https://ipsdomiciliaria.com"
+    
+    # Firma digital personalizada para correos salientes
+    SIGNATURE_NAME: str = "Coordinación Médica Domiciliaria"
+    SIGNATURE_ROLE: str = "Gestión de Pacientes & Admisiones"
+    SIGNATURE_INSTITUTION: str = "IPS Atención Domiciliaria"
+    SIGNATURE_PHONE: str = "+57 300 123 4567"
+    SIGNATURE_REGISTRATION: str = "R.M. No. 54321-Antioquia"
+    SIGNATURE_DISCLAIMER: str = "CONFIDENCIALIDAD: La información contenida en este correo está sujeta a reserva médica y secreto profesional (Ley 1581 de Protección de Datos Personales)."
+    REPLY_SIGNATURE: str = "Atentamente,\nCoordinación Médica Domiciliaria\nIPS Atención Domiciliaria\nPBX: +57 300 123 4567"
     
     AUTO_REPLY_CONFIDENCE_THRESHOLD: float = 95.0
     HUMAN_REVIEW_CONFIDENCE_THRESHOLD: float = 85.0

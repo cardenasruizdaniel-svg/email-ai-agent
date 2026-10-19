@@ -91,6 +91,20 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     metrics["email_provider"] = settings.EMAIL_PROVIDER
     return metrics
 
+@app.get("/api/metrics/drilldown")
+async def get_metric_drilldown(
+    metric_type: str = "total",
+    db: AsyncSession = Depends(get_db)
+):
+    """Returns detailed actionable items corresponding to a clicked KPI metric card."""
+    items = await Repository.get_metric_drilldown(db, metric_type)
+    return {
+        "status": "success",
+        "metric_type": metric_type,
+        "total": len(items),
+        "items": items
+    }
+
 @app.get("/api/emails")
 async def list_emails(
     category: Optional[str] = None,
@@ -413,6 +427,12 @@ async def get_full_config():
         "company_name": settings.COMPANY_NAME,
         "agent_name": settings.AGENT_NAME,
         "agent_role": settings.AGENT_ROLE,
+        "signature_name": getattr(settings, "SIGNATURE_NAME", "Coordinación Médica Domiciliaria"),
+        "signature_role": getattr(settings, "SIGNATURE_ROLE", "Gestión de Pacientes & Admisiones"),
+        "signature_institution": getattr(settings, "SIGNATURE_INSTITUTION", "IPS Atención Domiciliaria"),
+        "signature_phone": getattr(settings, "SIGNATURE_PHONE", "+57 300 123 4567"),
+        "signature_registration": getattr(settings, "SIGNATURE_REGISTRATION", "R.M. No. 54321-Antioquia"),
+        "signature_disclaimer": getattr(settings, "SIGNATURE_DISCLAIMER", "CONFIDENCIALIDAD: La información contenida en este correo está sujeta a reserva médica legal (Ley 1581)."),
         "reply_signature": settings.REPLY_SIGNATURE,
         "supervisor_email": getattr(settings, "SUPERVISOR_EMAIL", "coordinacion@clinica.com")
     }

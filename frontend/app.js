@@ -254,28 +254,245 @@ async function loadStats() {
         const res = await fetch("/api/stats");
         const data = await res.json();
 
-        document.getElementById("stat-total").innerText = data.total_received || 0;
-        document.getElementById("stat-replied").innerText = data.auto_replied || 0;
-        document.getElementById("stat-info").innerText = data.info_relevant || 0;
-        document.getElementById("stat-review").innerText = data.pending_review || 0;
-        document.getElementById("stat-urgent").innerText = data.urgent || 0;
-        document.getElementById("stat-attach").innerText = data.with_attachments || 0;
+        document.getElementById("stat-total").innerText = data.total_received ?? 0;
+        document.getElementById("stat-replied").innerText = data.auto_replied ?? 0;
+        document.getElementById("stat-info").innerText = data.in_process ?? data.info_relevant ?? 0;
+        document.getElementById("stat-review").innerText = data.stopped_cases ?? data.pending_review ?? 0;
+        document.getElementById("stat-urgent").innerText = data.completed ?? data.urgent ?? 0;
+        document.getElementById("stat-attach").innerText = data.with_attachments ?? 0;
 
-        document.getElementById("badge-review-count").innerText = data.pending_review || 0;
+        document.getElementById("badge-review-count").innerText = data.stopped_cases ?? data.pending_review ?? 0;
 
         // Toggle mode buttons
         const btnAuto = document.getElementById("btn-mode-auto");
         const btnSup = document.getElementById("btn-mode-supervised");
 
-        if (data.mode === "automatic") {
-            btnAuto.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all bg-indigo-600 text-white shadow-sm";
-            btnSup.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all text-slate-400 hover:text-slate-200";
-        } else {
-            btnSup.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all bg-amber-600 text-white shadow-sm";
-            btnAuto.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all text-slate-400 hover:text-slate-200";
+        if (btnAuto && btnSup) {
+            if (data.mode === "automatic") {
+                btnAuto.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all bg-indigo-600 text-white shadow-sm";
+                btnSup.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all text-slate-400 hover:text-slate-200";
+            } else {
+                btnSup.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all bg-amber-600 text-white shadow-sm";
+                btnAuto.className = "px-3 py-1 text-xs rounded-md font-semibold transition-all text-slate-400 hover:text-slate-200";
+            }
         }
     } catch (e) {
         console.error("Error loading stats:", e);
+    }
+}
+
+// --- METRIC DRILLDOWN SYSTEM (CLICK EN BOTONES KPI) ---
+
+let currentDrilldownItems = [];
+let currentDrilldownMetric = 'total';
+
+const METRIC_CONFIG = {
+    'total': {
+        title: 'Solicitudes Hoy',
+        desc: 'Bandeja completa de solicitudes y correos recibidos para gestión clínica.',
+        icon: 'fa-inbox',
+        color: 'text-indigo-400',
+        bg: 'bg-indigo-600/20'
+    },
+    'clasificados_ia': {
+        title: 'Clasificados por Inteligencia Artificial',
+        desc: 'Correos analizados, categorizados y con borrador de respuesta generado por la IA.',
+        icon: 'fa-wand-magic-sparkles',
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-600/20'
+    },
+    'en_proceso': {
+        title: 'Casos en Proceso de Atención',
+        desc: 'Pacientes activos en la cadena de atención domiciliaria pendientes de concepto o asignación.',
+        icon: 'fa-route',
+        color: 'text-cyan-400',
+        bg: 'bg-cyan-600/20'
+    },
+    'novedades_detenidos': {
+        title: '🚨 Novedades / Casos Detenidos',
+        desc: 'Expedientes desaprobados o con cuellos de botella reportados que requieren correctivo del supervisor.',
+        icon: 'fa-triangle-exclamation',
+        color: 'text-rose-400',
+        bg: 'bg-rose-600/20'
+    },
+    'completados': {
+        title: 'Casos y Solicitudes Completadas',
+        desc: 'Expedientes que han finalizado satisfactoriamente todas las etapas y firmas de atención.',
+        icon: 'fa-circle-check',
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-600/20'
+    },
+    'con_adjuntos': {
+        title: 'Con Órdenes / Adjuntos Médicos',
+        desc: 'Correos que adjuntan historias clínicas, autorizaciones de EPS o fórmulas médicas.',
+        icon: 'fa-paperclip',
+        color: 'text-purple-400',
+        bg: 'bg-purple-600/20'
+    }
+};
+
+async function openMetricDrilldown(metricType) {
+    currentDrilldownMetric = metricType;
+    const modal = document.getElementById("metric-drilldown-modal");
+    if (!modal) return;
+
+    const conf = METRIC_CONFIG[metricType] || METRIC_CONFIG['total'];
+    document.getElementById("drilldown-title").innerText = conf.title;
+    document.getElementById("drilldown-desc").innerText = conf.desc;
+    const iconEl = document.getElementById("drilldown-icon");
+    if (iconEl) iconEl.className = `fa-solid ${conf.icon} ${conf.color}`;
+
+    const searchInput = document.getElementById("drilldown-search");
+    if (searchInput) searchInput.value = "";
+
+    document.getElementById("drilldown-loading").classList.remove("hidden");
+    document.getElementById("drilldown-table").classList.add("hidden");
+    document.getElementById("drilldown-empty").classList.add("hidden");
+    document.getElementById("drilldown-badge-count").innerText = "...";
+
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+
+    try {
+        const res = await fetch(`/api/metrics/drilldown?metric_type=${encodeURIComponent(metricType)}`);
+        const data = await res.json();
+        currentDrilldownItems = data.items || [];
+
+        document.getElementById("drilldown-badge-count").innerText = currentDrilldownItems.length;
+        renderDrilldownItems(currentDrilldownItems);
+    } catch (e) {
+        console.error("Error opening metric drilldown:", e);
+        document.getElementById("drilldown-loading").classList.add("hidden");
+        document.getElementById("drilldown-empty").classList.remove("hidden");
+        document.getElementById("drilldown-empty-text").innerText = "Error al consultar los registros del servidor.";
+    }
+}
+
+function renderDrilldownItems(items) {
+    const loading = document.getElementById("drilldown-loading");
+    const empty = document.getElementById("drilldown-empty");
+    const table = document.getElementById("drilldown-table");
+    const tbody = document.getElementById("drilldown-table-body");
+    const summary = document.getElementById("drilldown-summary-info");
+
+    loading.classList.add("hidden");
+
+    if (!items || items.length === 0) {
+        table.classList.add("hidden");
+        empty.classList.remove("hidden");
+        if (summary) summary.innerText = "0 registros disponibles";
+        return;
+    }
+
+    empty.classList.add("hidden");
+    table.classList.remove("hidden");
+    tbody.innerHTML = "";
+    if (summary) summary.innerText = `Mostrando ${items.length} registros`;
+
+    items.forEach(it => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-750/50 transition-colors border-b border-slate-700/40";
+
+        // Status badge
+        let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700 text-slate-300">${it.stage_or_status || 'REGISTRADO'}</span>`;
+        if (it.stage_or_status && it.stage_or_status.includes("DETENIDO")) {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">🚨 DETENIDO</span>`;
+        } else if (it.stage_or_status && it.stage_or_status.includes("COMPLETADO")) {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✅ COMPLETADO</span>`;
+        } else if (it.stage_or_status && it.stage_or_status.includes("Etapa")) {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">${it.stage_or_status}</span>`;
+        }
+
+        // Attachments badge
+        let attachHtml = "";
+        if (it.attachments && it.attachments.length > 0) {
+            attachHtml = `<div class="mt-1 flex flex-wrap gap-1">` + it.attachments.map(a => 
+                `<span class="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded flex items-center space-x-1">
+                    <i class="fa-solid fa-paperclip text-[8px]"></i>
+                    <span class="truncate max-w-[120px]">${a.filename || 'Archivo'}</span>
+                </span>`
+            ).join("") + `</div>`;
+        }
+
+        // Action button style
+        let btnClass = "bg-indigo-600 hover:bg-indigo-500 text-white";
+        let btnIcon = "fa-arrow-right";
+        if (it.action_type === "CASE_DETAIL") {
+            btnClass = "bg-emerald-600 hover:bg-emerald-500 text-white";
+            btnIcon = "fa-clipboard-check";
+        } else if (it.action_type === "RESOLVE_CASE") {
+            btnClass = "bg-rose-600 hover:bg-rose-500 text-white";
+            btnIcon = "fa-wrench";
+        } else if (it.action_type === "EMAIL_DETAIL") {
+            btnClass = "bg-indigo-600 hover:bg-indigo-500 text-white";
+            btnIcon = "fa-envelope-open";
+        }
+
+        tr.innerHTML = `
+            <td class="p-3">
+                <div class="font-mono font-bold text-indigo-300 text-xs">${it.code}</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${it.date ? it.date.replace('T', ' ').substring(0, 16) : ''}</div>
+            </td>
+            <td class="p-3">
+                <div class="font-bold text-white text-xs">${it.sender_or_patient}</div>
+                <div class="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">${it.subtext || ''}</div>
+            </td>
+            <td class="p-3">
+                <div class="font-semibold text-slate-200 text-xs">${it.title}</div>
+                ${attachHtml}
+            </td>
+            <td class="p-3">
+                ${statusBadge}
+            </td>
+            <td class="p-3">
+                <div class="text-xs text-amber-300 font-medium bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 leading-relaxed">
+                    <i class="fa-solid fa-circle-info text-amber-400 mr-1 text-[10px]"></i>
+                    ${it.how_to_proceed}
+                </div>
+            </td>
+            <td class="p-3 text-right">
+                <button onclick="handleDrilldownAction('${it.action_type}', '${it.action_id}')" class="${btnClass} px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 ml-auto">
+                    <i class="fa-solid ${btnIcon} text-[10px]"></i>
+                    <span>${it.action_label}</span>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function filterDrilldownItems() {
+    const q = (document.getElementById("drilldown-search")?.value || "").toLowerCase().trim();
+    if (!q) {
+        renderDrilldownItems(currentDrilldownItems);
+        return;
+    }
+    const filtered = currentDrilldownItems.filter(it => 
+        (it.code && it.code.toLowerCase().includes(q)) ||
+        (it.title && it.title.toLowerCase().includes(q)) ||
+        (it.sender_or_patient && it.sender_or_patient.toLowerCase().includes(q)) ||
+        (it.subtext && it.subtext.toLowerCase().includes(q)) ||
+        (it.how_to_proceed && it.how_to_proceed.toLowerCase().includes(q))
+    );
+    renderDrilldownItems(filtered);
+}
+
+function closeMetricDrilldown() {
+    const modal = document.getElementById("metric-drilldown-modal");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+    }
+}
+
+function handleDrilldownAction(actionType, actionId) {
+    closeMetricDrilldown();
+    if (actionType === "CASE_DETAIL") {
+        openCaseDetailModal(parseInt(actionId));
+    } else if (actionType === "RESOLVE_CASE") {
+        openResolveModal(parseInt(actionId));
+    } else if (actionType === "EMAIL_DETAIL") {
+        openEmailModal(actionId);
     }
 }
 
@@ -635,10 +852,154 @@ async function loadFullConfig() {
         document.getElementById("cfg-agent-name").value = cfg.agent_name || "Asistente Virtual IA";
         const supInput = document.getElementById("cfg-supervisor-email");
         if (supInput) supInput.value = cfg.supervisor_email || "coordinacion@clinica.com";
-        document.getElementById("cfg-signature").value = cfg.reply_signature || "";
+        
+        // Digital Signature attributes
+        if (document.getElementById("cfg-sig-name")) document.getElementById("cfg-sig-name").value = cfg.signature_name || "";
+        if (document.getElementById("cfg-sig-role")) document.getElementById("cfg-sig-role").value = cfg.signature_role || "";
+        if (document.getElementById("cfg-sig-institution")) document.getElementById("cfg-sig-institution").value = cfg.signature_institution || "";
+        if (document.getElementById("cfg-sig-registration")) document.getElementById("cfg-sig-registration").value = cfg.signature_registration || "";
+        if (document.getElementById("cfg-sig-phone")) document.getElementById("cfg-sig-phone").value = cfg.signature_phone || "";
+        if (document.getElementById("cfg-sig-disclaimer")) document.getElementById("cfg-sig-disclaimer").value = cfg.signature_disclaimer || "";
+        if (document.getElementById("cfg-signature")) document.getElementById("cfg-signature").value = cfg.reply_signature || "";
+
+        // Trigger signature live preview
+        updateSignatureLivePreview(false);
     } catch (e) {
         console.error("Error loading config:", e);
     }
+}
+
+// --- DIGITAL SIGNATURE DESIGNER & GENERATOR ---
+
+function applySignatureTemplate(templateKey) {
+    const nameEl = document.getElementById("cfg-sig-name");
+    const roleEl = document.getElementById("cfg-sig-role");
+    const instEl = document.getElementById("cfg-sig-institution");
+    const regEl = document.getElementById("cfg-sig-registration");
+    const phoneEl = document.getElementById("cfg-sig-phone");
+    const webEl = document.getElementById("cfg-sig-web");
+    const discEl = document.getElementById("cfg-sig-disclaimer");
+
+    if (templateKey === "clinical") {
+        if (nameEl) nameEl.value = "Dra. Claudia Morales";
+        if (roleEl) roleEl.value = "Coordinadora de Atención Domiciliaria & Auditoría";
+        if (instEl) instEl.value = "IPS Atención Domiciliaria Integral";
+        if (regEl) regEl.value = "R.M. No. 54321 - Colegio Médico";
+        if (phoneEl) phoneEl.value = "+57 (604) 444-5566 • Ext. 102 / WhatsApp: +57 300 123 4567";
+        if (webEl) webEl.value = "www.ipsdomiciliaria.com";
+        if (discEl) discEl.value = "CONFIDENCIALIDAD MÉDICA: La información contenida en este correo está protegida por reserva clínica legal (Ley 1581 de Datos Personales). Su contenido es exclusivo para el cuidado asistencial del paciente.";
+    } else if (templateKey === "executive") {
+        if (nameEl) nameEl.value = "Gestión de Admisiones & Referencia";
+        if (roleEl) roleEl.value = "Dirección de Operaciones Asistenciales";
+        if (instEl) instEl.value = "IPS Atención Domiciliaria";
+        if (regEl) regEl.value = "Código Habilitación IPS: 050010098701";
+        if (phoneEl) phoneEl.value = "+57 (604) 444-5566 • Línea Nacional: 018000 123456";
+        if (webEl) webEl.value = "www.ipsdomiciliaria.com";
+        if (discEl) discEl.value = "AVISO LEGAL: Este mensaje puede contener información confidencial. Si no es el destinatario autorizado, por favor notifíquelo y elimine el mensaje.";
+    } else if (templateKey === "simple") {
+        if (nameEl) nameEl.value = "Atención al Usuario & Radicación";
+        if (roleEl) roleEl.value = "Gestión de Correos y Solicitudes";
+        if (instEl) instEl.value = "IPS Domiciliaria";
+        if (regEl) regEl.value = "";
+        if (phoneEl) phoneEl.value = "PBX: +57 300 123 4567";
+        if (webEl) webEl.value = "www.ipsdomiciliaria.com";
+        if (discEl) discEl.value = "";
+    }
+
+    updateSignatureLivePreview(true);
+}
+
+function updateSignatureLivePreview(syncTextarea = true) {
+    const name = document.getElementById("cfg-sig-name")?.value.trim() || "Dra. Claudia Morales";
+    const role = document.getElementById("cfg-sig-role")?.value.trim() || "Coordinación Médica Domiciliaria";
+    const inst = document.getElementById("cfg-sig-institution")?.value.trim() || "IPS Atención Domiciliaria";
+    const reg = document.getElementById("cfg-sig-registration")?.value.trim() || "";
+    const phone = document.getElementById("cfg-sig-phone")?.value.trim() || "";
+    const web = document.getElementById("cfg-sig-web")?.value.trim() || "";
+    const incDisc = document.getElementById("cfg-sig-include-disclaimer")?.checked ?? true;
+    const disc = incDisc ? (document.getElementById("cfg-sig-disclaimer")?.value.trim() || "") : "";
+
+    // Update DOM Live Preview Card
+    const prevName = document.getElementById("preview-sig-name");
+    const prevRole = document.getElementById("preview-sig-role");
+    const prevInst = document.getElementById("preview-sig-institution");
+    const prevDetails = document.getElementById("preview-sig-details");
+    const prevDisc = document.getElementById("preview-sig-disclaimer");
+
+    if (prevName) prevName.innerText = name;
+    if (prevRole) prevRole.innerText = role;
+    if (prevInst) prevInst.innerText = inst;
+
+    let detailsText = [];
+    if (reg) detailsText.push(reg);
+    if (phone) detailsText.push(`Tel: ${phone}`);
+    if (web) detailsText.push(web);
+    if (prevDetails) prevDetails.innerText = detailsText.join(" • ") || "Contacto y Registro";
+
+    if (prevDisc) {
+        if (disc) {
+            prevDisc.classList.remove("hidden");
+            prevDisc.innerText = disc;
+        } else {
+            prevDisc.classList.add("hidden");
+        }
+    }
+
+    if (syncTextarea) {
+        buildAndSyncSignature();
+    }
+}
+
+function buildAndSyncSignature() {
+    const name = document.getElementById("cfg-sig-name")?.value.trim() || "";
+    const role = document.getElementById("cfg-sig-role")?.value.trim() || "";
+    const inst = document.getElementById("cfg-sig-institution")?.value.trim() || "";
+    const reg = document.getElementById("cfg-sig-registration")?.value.trim() || "";
+    const phone = document.getElementById("cfg-sig-phone")?.value.trim() || "";
+    const web = document.getElementById("cfg-sig-web")?.value.trim() || "";
+    const incDisc = document.getElementById("cfg-sig-include-disclaimer")?.checked ?? true;
+    const disc = incDisc ? (document.getElementById("cfg-sig-disclaimer")?.value.trim() || "") : "";
+
+    let lines = ["Atentamente,"];
+    if (name) lines.push(name);
+    if (role) lines.push(role);
+    if (inst) lines.push(inst);
+    let extra = [];
+    if (reg) extra.push(reg);
+    if (phone) extra.push(phone);
+    if (extra.length > 0) lines.push(extra.join(" | "));
+    if (web) lines.push(web);
+    if (disc) {
+        lines.push("---");
+        lines.push(disc);
+    }
+
+    const fullSignatureText = lines.join("\n");
+    const sigTextarea = document.getElementById("cfg-signature");
+    if (sigTextarea) {
+        sigTextarea.value = fullSignatureText;
+    }
+}
+
+function insertSignatureIntoReply() {
+    const replyTextarea = document.getElementById("modal-draft-reply");
+    if (!replyTextarea) return;
+
+    const signature = document.getElementById("cfg-signature")?.value.trim() || 
+                      "Atentamente,\nCoordinación Médica Domiciliaria\nIPS Atención Domiciliaria";
+
+    let currentVal = replyTextarea.value.trim();
+    if (currentVal && currentVal.includes(signature.substring(0, 30))) {
+        alert("La firma digital ya se encuentra incluida en la respuesta.");
+        return;
+    }
+
+    if (currentVal.length > 0) {
+        replyTextarea.value = `${currentVal}\n\n${signature}`;
+    } else {
+        replyTextarea.value = signature;
+    }
+    alert("✅ Firma digital personalizada insertada con éxito en la respuesta.");
 }
 
 function applyEmailPreset() {
@@ -676,6 +1037,14 @@ async function saveFullConfig() {
         company_name: document.getElementById("cfg-company-name").value.trim(),
         agent_name: document.getElementById("cfg-agent-name").value.trim(),
         supervisor_email: document.getElementById("cfg-supervisor-email") ? document.getElementById("cfg-supervisor-email").value.trim() : "coordinacion@clinica.com",
+        
+        // Digital Signature attributes
+        signature_name: document.getElementById("cfg-sig-name") ? document.getElementById("cfg-sig-name").value.trim() : "",
+        signature_role: document.getElementById("cfg-sig-role") ? document.getElementById("cfg-sig-role").value.trim() : "",
+        signature_institution: document.getElementById("cfg-sig-institution") ? document.getElementById("cfg-sig-institution").value.trim() : "",
+        signature_registration: document.getElementById("cfg-sig-registration") ? document.getElementById("cfg-sig-registration").value.trim() : "",
+        signature_phone: document.getElementById("cfg-sig-phone") ? document.getElementById("cfg-sig-phone").value.trim() : "",
+        signature_disclaimer: document.getElementById("cfg-sig-disclaimer") ? document.getElementById("cfg-sig-disclaimer").value.trim() : "",
         reply_signature: document.getElementById("cfg-signature").value.trim()
     };
 
@@ -692,7 +1061,7 @@ async function saveFullConfig() {
         });
         const data = await res.json();
         if (res.ok) {
-            alert("✅ Configuración guardada e implementada correctamente en tiempo real.");
+            alert("✅ Configuración y Firma Digital guardadas e implementadas correctamente.");
             triggerSync();
         } else {
             alert("Error: " + data.detail);
@@ -1560,4 +1929,12 @@ window.showLoginModal = showLoginModal;
 window.hideLoginModal = hideLoginModal;
 window.setAppTheme = setAppTheme;
 window.initTheme = initTheme;
+window.openMetricDrilldown = openMetricDrilldown;
+window.closeMetricDrilldown = closeMetricDrilldown;
+window.filterDrilldownItems = filterDrilldownItems;
+window.handleDrilldownAction = handleDrilldownAction;
+window.applySignatureTemplate = applySignatureTemplate;
+window.updateSignatureLivePreview = updateSignatureLivePreview;
+window.buildAndSyncSignature = buildAndSyncSignature;
+window.insertSignatureIntoReply = insertSignatureIntoReply;
 

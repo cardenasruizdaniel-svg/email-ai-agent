@@ -202,3 +202,38 @@ body.theme-light #user-profile-badge {
     border-color: #e2e8f0 !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
+
+/* Metric KPI Cards Interaction */
+.metric-kpi-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.metric-kpi-card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Light Mode Overrides for Drilldown & Signature */
+body.theme-light .metric-kpi-card {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+body.theme-light .metric-kpi-card:hover {
+    background-color: #f8fafc !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+body.theme-light #metric-drilldown-modal {
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    backdrop-filter: blur(4px);
+}
+body.theme-light #metric-drilldown-modal > div {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+body.theme-light #sig-live-preview-box {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+
