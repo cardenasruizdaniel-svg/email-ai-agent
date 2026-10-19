@@ -67,6 +67,12 @@
                 <span>Sincronizar</span>
             </button>
 
+            <!-- Manual Operativo PADO Agudo Button -->
+            <button onclick="openManualModal()" class="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-all shadow-md" title="Ver Manual de Operación Oficial PADO Agudo HomeCare del Quindío">
+                <i class="fa-solid fa-book-medical"></i>
+                <span class="hidden sm:inline">Manual PADO</span>
+            </button>
+
             <!-- User Profile & Logout -->
             <div id="user-profile-badge" class="hidden flex items-center space-x-3 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 shadow-sm">
                 <div id="user-avatar-initials" class="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs">
@@ -771,6 +777,31 @@
                                     <button type="button" onclick="buildAndSyncSignature()" class="text-[10px] text-purple-400 hover:text-purple-300 underline font-semibold">Regenerar desde datos</button>
                                 </div>
                                 <textarea id="cfg-signature" rows="6" placeholder="Atentamente,\nCoordinación Médica..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- CENTRO DE ENTRENAMIENTO DE LA IA (PADO AGUDO HOMECARE) -->
+                    <div class="col-span-1 md:col-span-2 bg-slate-900/60 p-5 rounded-xl border border-slate-700 space-y-4">
+                        <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-700/80 pb-3">
+                            <div>
+                                <h3 class="font-bold text-emerald-400 text-sm flex items-center space-x-2">
+                                    <i class="fa-solid fa-brain"></i>
+                                    <span>4. Centro de Entrenamiento de la IA (Reglas de Asignación PADO Agudo)</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Entrene a la IA definiendo cómo debe clasificar los correos entrantes, reconocer EPS, validar días de tratamiento y asignar tareas al personal de HomeCare del Quindío.</p>
+                            </div>
+                            <button type="button" onclick="resetAiTrainingDefaults()" class="px-3 py-1 text-[11px] rounded bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 border border-emerald-500/40 transition-all font-semibold flex items-center space-x-1 shadow-sm">
+                                <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                                <span>Restablecer Directrices Oficiales HomeCare</span>
+                            </button>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1 text-[11px]">Directrices de Asignación y Comportamiento del Agente</label>
+                            <textarea id="cfg-ai-training" rows="7" placeholder="Escriba aquí las reglas con las que la IA debe analizar y asignar los casos..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"></textarea>
+                            <div class="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+                                <span>La IA aplicará estas reglas en tiempo real a cada correo recibido para radicar y asignar el caso.</span>
+                                <span class="text-emerald-400 font-bold">✔ Flujo HomeCare del Quindío I.P.S. Activo</span>
                             </div>
                         </div>
                     </div>
@@ -1270,6 +1301,316 @@
                 <button onclick="submitQuickRejectModal()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-md">
                     <i class="fa-solid fa-paper-plane text-xs"></i>
                     <span>Desaprobar y Alertar Coordinación</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANUAL OPERATIVO PADO AGUDO (HOMECARE DEL QUINDÍO I.P.S.) -->
+    <div id="manual-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[95] hidden flex items-center justify-center p-3 sm:p-6">
+        <div class="bg-slate-800 border border-slate-700 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <!-- Modal Header -->
+            <div class="p-5 bg-slate-900 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-600 flex items-center justify-center text-white text-xl shadow-md">
+                        <i class="fa-solid fa-book-medical"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="font-black text-white text-lg tracking-tight">Manual Operativo Oficial: Flujo PADO Agudo</h3>
+                            <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">HomeCare del Quindío I.P.S.</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Guía de procedimientos, asignación por departamentos, checklist de insumos y parametrización de la IA.</p>
+                    </div>
+                </div>
+                <button onclick="closeManualModal()" class="text-slate-400 hover:text-white text-xl p-2 rounded-xl hover:bg-slate-800 transition-all">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content (Scrollable) -->
+            <div class="overflow-y-auto flex-1 p-6 space-y-6 text-xs text-slate-300">
+
+                <!-- 1. DEPARTAMENTOS Y EQUIPO ASIGNADO (4 COLUMNAS SEGÚN DIAGRAMA OFICIAL) -->
+                <div>
+                    <h4 class="font-bold text-white text-sm flex items-center space-x-2 mb-3">
+                        <i class="fa-solid fa-network-wired text-indigo-400"></i>
+                        <span>1. Departamentos y Responsables Asignados (Diagrama Oficial PADO Agudo)</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <!-- ATENCIÓN AL USUARIO (PÚRPURA) -->
+                        <div class="bg-purple-950/20 border-2 border-purple-500/40 rounded-2xl p-4 space-y-2">
+                            <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+                                <i class="fa-solid fa-headset text-sm"></i>
+                                <span>Atención al Usuario</span>
+                            </div>
+                            <div class="space-y-1.5 pt-1 text-[11px]">
+                                <div class="bg-slate-900/80 p-2 rounded-lg border border-purple-500/30">
+                                    <div class="font-bold text-white">Carolina Venencia</div>
+                                    <div class="text-[10px] text-purple-300">Recepción correo principal, inicio de ciclo PADO, aceptación/rechazo al remitente.</div>
+                                </div>
+                                <div class="bg-slate-900/80 p-2 rounded-lg border border-purple-500/30">
+                                    <div class="font-bold text-white">Franchesca Triviño</div>
+                                    <div class="text-[10px] text-purple-300">Contacto con paciente, creación en Medifolios, ingreso a cuadros de aplicadores.</div>
+                                </div>
+                                <div class="bg-slate-900/80 p-2 rounded-lg border border-purple-500/30">
+                                    <div class="font-bold text-white">Yurli</div>
+                                    <div class="text-[10px] text-purple-300">Monitoreo de aplicaciones y salida de paciente en módulo de hospitalización.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DEPARTAMENTO INVENTARIOS (VERDE) -->
+                        <div class="bg-emerald-950/20 border-2 border-emerald-500/40 rounded-2xl p-4 space-y-2">
+                            <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                                <i class="fa-solid fa-boxes-stacked text-sm"></i>
+                                <span>Inventarios & Farmacia</span>
+                            </div>
+                            <div class="space-y-1.5 pt-1 text-[11px]">
+                                <div class="bg-slate-900/80 p-2.5 rounded-lg border border-emerald-500/30">
+                                    <div class="font-bold text-white">German Giraldo</div>
+                                    <div class="text-[10px] text-emerald-300 mt-0.5">• Verificación si el insumo está contratado.</div>
+                                    <div class="text-[10px] text-emerald-300">• Orden de compra de medicamentos.</div>
+                                    <div class="text-[10px] text-emerald-300">• Alistamiento y entrega de insumos.</div>
+                                    <div class="text-[10px] text-emerald-300">• Solicitud de reintegro de sobrantes.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DEPARTAMENTO FACTURACIÓN (ROJO / SALMÓN) -->
+                        <div class="bg-rose-950/20 border-2 border-rose-500/40 rounded-2xl p-4 space-y-2">
+                            <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                                <i class="fa-solid fa-file-invoice-dollar text-sm"></i>
+                                <span>Facturación & Cuentas</span>
+                            </div>
+                            <div class="space-y-1.5 pt-1 text-[11px]">
+                                <div class="bg-slate-900/80 p-2.5 rounded-lg border border-rose-500/30">
+                                    <div class="font-bold text-white">Esteban Gacha</div>
+                                    <div class="text-[10px] text-rose-300 mt-0.5">• Confirmar afiliación a la EPS.</div>
+                                    <div class="text-[10px] text-rose-300">• Verificación y recaudo de copago.</div>
+                                    <div class="text-[10px] text-rose-300">• Ingreso al censo diario (Secretaría de Salud y EPS).</div>
+                                    <div class="text-[10px] text-rose-300">• Verificar autorización y facturación final.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DEPARTAMENTO ASISTENCIAL (AZUL) -->
+                        <div class="bg-cyan-950/20 border-2 border-cyan-500/40 rounded-2xl p-4 space-y-2">
+                            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+                                <i class="fa-solid fa-user-doctor text-sm"></i>
+                                <span>Dpto. Asistencial & PADO</span>
+                            </div>
+                            <div class="space-y-1.5 pt-1 text-[11px]">
+                                <div class="bg-slate-900/80 p-2 rounded-lg border border-cyan-500/30">
+                                    <div class="font-bold text-white">Dr. Hernando Vence (Médico)</div>
+                                    <div class="text-[10px] text-cyan-300">Valoración integral (en sitio egreso clínica / por teléfono ambulatorio). Consentimiento informado y nota de egreso.</div>
+                                </div>
+                                <div class="bg-slate-900/80 p-2 rounded-lg border border-cyan-500/30">
+                                    <div class="font-bold text-white">Dr. Federico Cortes (Coordinador)</div>
+                                    <div class="text-[10px] text-cyan-300">Confirmación de horarios, aceptación/rechazo técnico, envío de correo formal y solicitud copago en extensión.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. PROTOCOLO EXACTO DE ALISTAMIENTO DE MEDICAMENTOS E INSUMOS (GERMAN GIRALDO) -->
+                <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-5 space-y-3">
+                    <h4 class="font-bold text-emerald-400 text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-prescription-bottle-medical"></i>
+                        <span>2. Protocolo de Alistamiento de Insumos según Días de Tratamiento (German Giraldo)</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-800/90 p-4 rounded-xl border border-slate-700 space-y-2">
+                            <span class="font-bold text-amber-300 text-xs block">Tratamiento PADO MENOR a 3 Días:</span>
+                            <ul class="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                                <li><strong>1 Catéter 22</strong> y <strong>1 Catéter 24</strong></li>
+                                <li><strong>2 Tapones</strong></li>
+                                <li><strong>1 Macrogotero (Macros)</strong></li>
+                                <li><strong>1 Jeringa</strong> por cada aplicación</li>
+                                <li><strong>1 Solución de 100 cc</strong> por cada aplicación</li>
+                                <li><strong>Guantes</strong> (un par por cada aplicación)</li>
+                                <li><strong>1 Isopañil</strong> por cada aplicación</li>
+                            </ul>
+                        </div>
+                        <div class="bg-slate-800/90 p-4 rounded-xl border border-slate-700 space-y-2">
+                            <span class="font-bold text-emerald-300 text-xs block">Tratamiento PADO MAYOR o IGUAL a 3 Días:</span>
+                            <p class="text-slate-300 text-[11px] leading-relaxed">
+                                Se alista la dotación base anterior multiplicada proporcionalmente por el número exacto de días autorizados por la EPS en la fórmula médica.
+                            </p>
+                            <div class="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-lg text-emerald-300 text-[10px]">
+                                <strong>Al Egreso del Paciente:</strong> German Giraldo realiza la solicitud de reintegro de medicamentos e insumos sobrantes para retorno a stock.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. PASO A PASO DEL FLUJO PADO AGUDO (DESDE EL CORREO HASTA LA FACTURACIÓN) -->
+                <div>
+                    <h4 class="font-bold text-white text-sm flex items-center space-x-2 mb-3">
+                        <i class="fa-solid fa-list-ol text-cyan-400"></i>
+                        <span>3. Secuencia Operativa Paso a Paso del Ciclo PADO</span>
+                    </h4>
+                    <div class="space-y-2.5 font-sans">
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-purple-500 flex items-start space-x-3">
+                            <span class="font-black text-purple-400 text-sm">Paso 1:</span>
+                            <div>
+                                <span class="font-bold text-white">Recepción de Solicitud (Carolina Venencia):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Llega el correo de la EPS o clínica con la fórmula y datos del paciente. La IA extrae los datos y crea el caso PADO Agudo asignándolo a Carolina Venencia.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-emerald-500 flex items-start space-x-3">
+                            <span class="font-black text-emerald-400 text-sm">Paso 2:</span>
+                            <div>
+                                <span class="font-bold text-white">Verificación de Insumos & Medicamentos (German Giraldo):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">¿El insumo está contratado? Si NO, se informa rechazo técnico a Federico Cortes -> Carolina informa rechazo a remitente. Si SÍ, se emite orden de compra o alistamiento.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-rose-500 flex items-start space-x-3">
+                            <span class="font-black text-rose-400 text-sm">Paso 3:</span>
+                            <div>
+                                <span class="font-bold text-white">Copago & Afiliación EPS (Esteban Gacha):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Verifica si el usuario canceló el copago y confirma estado activo ante la EPS. Si no cancela copago, se notifica rechazo.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-purple-500 flex items-start space-x-3">
+                            <span class="font-black text-purple-400 text-sm">Paso 4:</span>
+                            <div>
+                                <span class="font-bold text-white">Contacto & Creación en Medifolios (Franchesca Triviño):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Se comunica con el paciente/familia y lo crea en el software asistencial Medifolios. Si no cumple criterios, se notifica rechazo.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-cyan-500 flex items-start space-x-3">
+                            <span class="font-black text-cyan-400 text-sm">Paso 5:</span>
+                            <div>
+                                <span class="font-bold text-white">Valoración Médica Integral (Dr. Hernando Vence):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Revisa historia clínica. Si el paciente es egreso de clínica/hospital, se realiza valoración presencial en sitio; si es ambulatorio, por teléfono. Define si requiere servicios adicionales (curaciones, sondas, etc.).</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-indigo-500 flex items-start space-x-3">
+                            <span class="font-black text-indigo-400 text-sm">Paso 6:</span>
+                            <div>
+                                <span class="font-bold text-white">Horarios, Consentimiento & Aceptación (Dr. Federico Cortes & Dr. Hernando Vence):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Federico confirma horarios de aplicación. Se diligencia consentimiento informado e historia de ingreso a hospitalización domiciliaria. Federico envía correo de aceptación y Carolina informa formalmente a la EPS/remitente.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-emerald-500 flex items-start space-x-3">
+                            <span class="font-black text-emerald-400 text-sm">Paso 7:</span>
+                            <div>
+                                <span class="font-bold text-white">Alistamiento & Entrega de Insumos (German Giraldo):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">German alista el kit de catéteres, macrogoteros, jeringas y soluciones y los entrega al personal aplicador.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-amber-500 flex items-start space-x-3">
+                            <span class="font-black text-amber-400 text-sm">Paso 8:</span>
+                            <div>
+                                <span class="font-bold text-white">Cuadros de Aplicadores & Censo Diario (Franchesca Triviño & Esteban Gacha):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Franchesca ingresa el paciente al cuadro de turnos y asigna el aplicador de enfermería. Esteban reporta el ingreso al censo diario de Secretaría de Salud y EPS.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-purple-500 flex items-start space-x-3">
+                            <span class="font-black text-purple-400 text-sm">Paso 9:</span>
+                            <div>
+                                <span class="font-bold text-white">Monitoreo de Aplicaciones (Franchesca Triviño & Yurli):</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Supervisión de cada dosis administrada. En caso de extensión médica de días, alertan al correo principal y a Federico Cortes para cobro de copago adicional si aplica.</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border-l-4 border-blue-500 flex items-start space-x-3">
+                            <span class="font-black text-blue-400 text-sm">Paso 10:</span>
+                            <div>
+                                <span class="font-bold text-white">Visita Médica de Egreso, Reintegro & Facturación Final:</span>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Dr. Hernando Vence emite nota de egreso (por terminación, abandono o reintegro). Yurli da salida en el módulo de hospitalización. German solicita reintegro de sobrantes. Esteban verifica autorización y factura el servicio.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. CREDENCIALES POR DEFECTO DEL EQUIPO DE HOMECARE DEL QUINDÍO -->
+                <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-5 space-y-3">
+                    <h4 class="font-bold text-purple-400 text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <span>4. Directorio de Acceso del Personal HomeCare del Quindío</span>
+                    </h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                                <tr>
+                                    <th class="p-2.5">Funcionario</th>
+                                    <th class="p-2.5">Departamento</th>
+                                    <th class="p-2.5">Usuario</th>
+                                    <th class="p-2.5">Contraseña Inicial</th>
+                                    <th class="p-2.5">Rol en el Sistema</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Carolina Venencia</td>
+                                    <td class="p-2.5 text-purple-300">Atención al Usuario</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">carolina</td>
+                                    <td class="p-2.5 font-mono">carolina123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">German Giraldo</td>
+                                    <td class="p-2.5 text-emerald-300">Inventarios & Farmacia</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">german</td>
+                                    <td class="p-2.5 font-mono">german123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Esteban Gacha</td>
+                                    <td class="p-2.5 text-rose-300">Facturación & Cuentas</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">esteban</td>
+                                    <td class="p-2.5 font-mono">esteban123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Franchesca Triviño</td>
+                                    <td class="p-2.5 text-purple-300">Atención al Usuario / Medifolios</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">franchesca</td>
+                                    <td class="p-2.5 font-mono">franchesca123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Yurli</td>
+                                    <td class="p-2.5 text-purple-300">Hospitalización Domiciliaria</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">yurli</td>
+                                    <td class="p-2.5 font-mono">yurli123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Dr. Hernando Vence</td>
+                                    <td class="p-2.5 text-cyan-300">Departamento Asistencial (Médico)</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">hernando</td>
+                                    <td class="p-2.5 font-mono">hernando123</td>
+                                    <td class="p-2.5 font-semibold text-emerald-400">OPERADOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Dr. Federico Cortes</td>
+                                    <td class="p-2.5 text-cyan-300">Coordinador Asistencial PADO</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">federico</td>
+                                    <td class="p-2.5 font-mono">federico123</td>
+                                    <td class="p-2.5 font-semibold text-purple-400">ADMIN / SUPERVISOR</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2.5 font-bold text-white">Dirección General HomeCare</td>
+                                    <td class="p-2.5 text-slate-300">Todas las Áreas</td>
+                                    <td class="p-2.5 font-mono text-indigo-300">admin</td>
+                                    <td class="p-2.5 font-mono">admin123</td>
+                                    <td class="p-2.5 font-semibold text-purple-400">ADMIN / SUPERVISOR</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-slate-900 border-t border-slate-700 flex justify-between items-center text-xs">
+                <span class="text-slate-400 font-medium">HomeCare del Quindío I.P.S. • Manual de Calidad y Procesos Asistenciales</span>
+                <button onclick="closeManualModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2 rounded-xl transition-all shadow-md">
+                    Entendido / Cerrar
                 </button>
             </div>
         </div>

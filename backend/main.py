@@ -434,7 +434,8 @@ async def get_full_config():
         "signature_registration": getattr(settings, "SIGNATURE_REGISTRATION", "R.M. No. 54321-Antioquia"),
         "signature_disclaimer": getattr(settings, "SIGNATURE_DISCLAIMER", "CONFIDENCIALIDAD: La información contenida en este correo está sujeta a reserva médica legal (Ley 1581)."),
         "reply_signature": settings.REPLY_SIGNATURE,
-        "supervisor_email": getattr(settings, "SUPERVISOR_EMAIL", "coordinacion@clinica.com")
+        "supervisor_email": getattr(settings, "SUPERVISOR_EMAIL", "federico.cortes@homecaredelquindio.com"),
+        "ai_training_instructions": getattr(settings, "AI_TRAINING_INSTRUCTIONS", "")
     }
 
 @app.post("/api/config/full")

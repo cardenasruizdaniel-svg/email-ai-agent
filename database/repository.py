@@ -400,77 +400,114 @@ class Repository:
 
     @staticmethod
     async def get_or_create_default_workflows(db: AsyncSession) -> List[WorkflowDefinition]:
-        """Ensures default workflows exist (e.g., Ingreso de Pacientes, Autorizaciones)."""
+        """Ensures default workflows exist, including official PADO Agudo for HomeCare del Quindío I.P.S."""
         stmt = select(WorkflowDefinition)
         result = await db.execute(stmt)
         existing = list(result.scalars().all())
-        if existing:
-            return existing
 
-        default_supervisor = getattr(settings, "SUPERVISOR_EMAIL", "coordinacion@clinica.com")
-        
-        # 1. Ingreso de Pacientes
-        wf_ingreso = WorkflowDefinition(
-            name="Ingreso de Pacientes",
-            description="Flujo secuencial de admisión: Admisiones -> Auditoría Médica -> Asignación de Camas",
-            trigger_keywords=json.dumps(["ingreso", "paciente", "cama", "admision", "admisión", "hospitalizacion", "hospitalización"]),
-            trigger_category="SOLICITUD",
-            target_folder="Ingreso Pacientes",
-            supervisor_email=default_supervisor,
-            steps=json.dumps([
-                {
-                    "step_number": 1,
-                    "name": "Admisiones",
-                    "assigned_email": "admisiones@clinica.com",
-                    "action_required": "Verificar orden de hospitalización y documento del paciente"
-                },
-                {
-                    "step_number": 2,
-                    "name": "Auditoría Médica",
-                    "assigned_email": "auditoria@clinica.com",
-                    "action_required": "Validar pertinencia clínica, cobertura y autorizaciones"
-                },
-                {
-                    "step_number": 3,
-                    "name": "Asignación de Camas",
-                    "assigned_email": "camas@clinica.com",
-                    "action_required": "Asignar pabellón, habitación y cama disponible"
-                }
-            ]),
-            is_active=True
-        )
+        pado_exists = any("PADO" in w.name for w in existing)
+        if not pado_exists:
+            wf_pado = WorkflowDefinition(
+                name="PADO Agudo - HomeCare del Quindío",
+                description="Flujo Institucional Oficial PADO Agudo: Atención al Usuario -> Inventarios -> Facturación -> Asistencial -> Asignación y Cierre",
+                trigger_keywords=json.dumps([
+                    "pado", "pados", "agudo", "homecare", "domiciliaria", "ceftriaxona",
+                    "antibiotico", "antibiótico", "insumos", "cateter", "catéter",
+                    "aplicador", "medifolios", "valoracion", "valoración", "alta hospitalaria"
+                ]),
+                trigger_category="SOLICITUD",
+                target_folder="PADO Agudo",
+                supervisor_email="federico.cortes@homecaredelquindio.com",
+                steps=json.dumps([
+                    {
+                        "step_number": 1,
+                        "name": "Recepción & Inicio PADO",
+                        "department": "Atención al Usuario",
+                        "responsible_person": "Carolina Venencia",
+                        "assigned_email": "carolina.venencia@homecaredelquindio.com",
+                        "action_required": "Solicitud llega al correo principal. Dar inicio al ciclo PADO y verificar procedencia (clínica o ambulatoria)."
+                    },
+                    {
+                        "step_number": 2,
+                        "name": "Verificación de Medicamentos e Insumos",
+                        "department": "Inventarios",
+                        "responsible_person": "German Giraldo",
+                        "assigned_email": "german.giraldo@homecaredelquindio.com",
+                        "action_required": "Verificar si el insumo está contratado. Si no, notificar rechazo técnico. Si sí, alistar orden de compra."
+                    },
+                    {
+                        "step_number": 3,
+                        "name": "Verificación de Copago & Afiliación EPS",
+                        "department": "Facturación",
+                        "responsible_person": "Esteban Gacha",
+                        "assigned_email": "esteban.gacha@homecaredelquindio.com",
+                        "action_required": "Confirmar afiliación a EPS y cobro/recaudo de copago. Si no cancela copago, reportar detención."
+                    },
+                    {
+                        "step_number": 4,
+                        "name": "Comunicación con Paciente & Medifolios",
+                        "department": "Atención al Usuario",
+                        "responsible_person": "Franchesca Triviño",
+                        "assigned_email": "franchesca.trivino@homecaredelquindio.com",
+                        "action_required": "Contactar al paciente/acudiente y registrarlo en software Medifolios. Si no cumple criterios, emitir rechazo."
+                    },
+                    {
+                        "step_number": 5,
+                        "name": "Valoración Médica Integral",
+                        "department": "Departamento Asistencial",
+                        "responsible_person": "Dr. Hernando Vence",
+                        "assigned_email": "hernando.vence@homecaredelquindio.com",
+                        "action_required": "Realizar valoración integral presencial (si es egreso de clínica) o telefónica (si es ambulatorio). Determinar si requiere servicios adicionales (curaciones, cambio de sondas)."
+                    },
+                    {
+                        "step_number": 6,
+                        "name": "Aceptación PADO, Horarios & Consentimiento",
+                        "department": "Departamento Asistencial",
+                        "responsible_person": "Dr. Federico Cortes & Dr. Hernando Vence",
+                        "assigned_email": "federico.cortes@homecaredelquindio.com",
+                        "action_required": "Confirmar horarios de aplicaciones, diligenciar consentimiento informado e historia de ingreso a hospitalización domiciliaria. Enviar correo formal de aceptación al remitente."
+                    },
+                    {
+                        "step_number": 7,
+                        "name": "Alistamiento & Entrega de Insumos",
+                        "department": "Inventarios",
+                        "responsible_person": "German Giraldo",
+                        "assigned_email": "german.giraldo@homecaredelquindio.com",
+                        "action_required": "Alistamiento según duración: Menores a 3 días (1 catéter 22, 1 catéter 24, 2 tapones, 1 macrogotero, 1 jeringa x aplicación, 1 solución 100cc x aplicación, guantes x aplicación, isopañiles). Si > 3 días según cantidad. Proceder con entrega."
+                    },
+                    {
+                        "step_number": 8,
+                        "name": "Asignación de Personal & Censo Diario",
+                        "department": "Atención al Usuario & Facturación",
+                        "responsible_person": "Franchesca Triviño & Esteban Gacha",
+                        "assigned_email": "franchesca.trivino@homecaredelquindio.com",
+                        "action_required": "Franchesca ingresa a cuadros de aplicadores y asigna personal asistencial. Esteban registra en el censo diario ante Secretaría de Salud y EPS."
+                    },
+                    {
+                        "step_number": 9,
+                        "name": "Monitoreo de Aplicaciones Asistenciales",
+                        "department": "Atención al Usuario",
+                        "responsible_person": "Franchesca Triviño & Yurli",
+                        "assigned_email": "yurli@homecaredelquindio.com",
+                        "action_required": "Monitorear visitas del aplicador asignado. En caso de extensión del tratamiento, alertar a Federico Cortes para solicitar copago de ser necesario."
+                    },
+                    {
+                        "step_number": 10,
+                        "name": "Visita Médica de Egreso, Reintegro & Facturación",
+                        "department": "Asistencial, Inventarios & Facturación",
+                        "responsible_person": "Dr. Hernando Vence, German Giraldo & Esteban Gacha",
+                        "assigned_email": "esteban.gacha@homecaredelquindio.com",
+                        "action_required": "Dr. Hernando Vence emite nota de egreso (terminación de tratamiento, abandono o reintegro a clínica). Yurli registra salida en módulo hospitalización. German solicita reintegro de sobrantes. Esteban verifica autorización y factura."
+                    }
+                ]),
+                is_active=True
+            )
+            db.add(wf_pado)
+            await db.commit()
+            await db.refresh(wf_pado)
+            existing.append(wf_pado)
 
-        # 2. Autorizaciones Médicas
-        wf_autorizaciones = WorkflowDefinition(
-            name="Autorizaciones Médicas",
-            description="Flujo de gestión y radicación de autorizaciones médicas con EPS",
-            trigger_keywords=json.dumps(["autorizacion", "autorización", "orden medica", "orden médica", "eps", "cobertura"]),
-            trigger_category="SOLICITUD",
-            target_folder="Autorizaciones",
-            supervisor_email=default_supervisor,
-            steps=json.dumps([
-                {
-                    "step_number": 1,
-                    "name": "Radicación EPS",
-                    "assigned_email": "radicacion@clinica.com",
-                    "action_required": "Radicar orden ante la EPS y solicitar número de autorización"
-                },
-                {
-                    "step_number": 2,
-                    "name": "Facturación y Convenios",
-                    "assigned_email": "facturacion@clinica.com",
-                    "action_required": "Verificar tarifa contratada y confirmar aval de atención"
-                }
-            ]),
-            is_active=True
-        )
-
-        db.add(wf_ingreso)
-        db.add(wf_autorizaciones)
-        await db.commit()
-        await db.refresh(wf_ingreso)
-        await db.refresh(wf_autorizaciones)
-        return [wf_ingreso, wf_autorizaciones]
+        return existing
 
     @staticmethod
     async def match_workflow(db: AsyncSession, topic: str = "", text: str = "") -> Optional[WorkflowDefinition]:
@@ -873,36 +910,43 @@ class Repository:
 
     @staticmethod
     async def seed_default_users(db: AsyncSession) -> None:
-        """Seeds default clinical and operational users for the Home Care IPS."""
+        """Seeds default clinical and operational users for HomeCare del Quindío I.P.S."""
         from backend.services.auth import AuthService
-        stmt = select(func.count(UserAccount.id))
-        count = (await db.execute(stmt)).scalar() or 0
-        if count > 0:
-            return
 
-        default_users = [
-            ("admin", "admin123", "Dr. Coordinador General IPS", "coordinacion@ipsdomiciliaria.com", "ADMIN", "TODAS", "3001234567"),
-            ("admisiones", "adm123", "Lic. Carlos Ruiz (Admisiones Domiciliarias)", "admisiones@ipsdomiciliaria.com", "OPERADOR", "Admisiones", "3109876543"),
-            ("auditoria", "aud123", "Dra. Elena Ramos (Auditoría Médica)", "auditoria@ipsdomiciliaria.com", "OPERADOR", "Auditoría Médica", "3154567890"),
-            ("logistica", "log123", "Ing. Mario Restrepo (Logística, Rutas y Equipos)", "logistica@ipsdomiciliaria.com", "OPERADOR", "Logística y Asignación de Rutas", "3206543210"),
-            ("camas", "camas123", "Gestor de Asignación y Equipos Clínicos", "camas@clinica.com", "OPERADOR", "Asignación de Camas", "3112223344"),
+        homecare_users = [
+            ("admin", "admin123", "Coordinador General HomeCare", "coordinacion@homecaredelquindio.com", "ADMIN", "TODAS", "3001234567"),
+            ("carolina", "carolina123", "Carolina Venencia (Atención al Usuario)", "carolina.venencia@homecaredelquindio.com", "OPERADOR", "Atención al Usuario - Radicación Principal", "3101112233"),
+            ("german", "german123", "German Giraldo (Inventarios & Farmacia)", "german.giraldo@homecaredelquindio.com", "OPERADOR", "Inventarios - Medicamentos e Insumos", "3152223344"),
+            ("esteban", "esteban123", "Esteban Gacha (Facturación & Cuentas)", "esteban.gacha@homecaredelquindio.com", "OPERADOR", "Facturación - Copagos & Censo", "3203334455"),
+            ("franchesca", "franchesca123", "Franchesca Triviño (Medifolios & Asignación)", "franchesca.trivino@homecaredelquindio.com", "OPERADOR", "Atención al Usuario - Medifolios", "3114445566"),
+            ("yurli", "yurli123", "Yurli (Hospitalización Domiciliaria)", "yurli@homecaredelquindio.com", "OPERADOR", "Atención al Usuario - Monitoreo & Egreso", "3125556677"),
+            ("hernando", "hernando123", "Dr. Hernando Vence (Médico General)", "hernando.vence@homecaredelquindio.com", "OPERADOR", "Departamento Asistencial - Médico", "3166667788"),
+            ("federico", "federico123", "Dr. Federico Cortes (Coordinador PADO)", "federico.cortes@homecaredelquindio.com", "ADMIN", "Coordinación Asistencial PADO", "3177778899"),
         ]
-        for uname, pwd, name, mail, role, stage, phone in default_users:
-            pwd_hash, salt = AuthService.hash_password(pwd)
-            u = UserAccount(
-                username=uname,
-                password_hash=pwd_hash,
-                salt=salt,
-                full_name=name,
-                email=mail,
-                role=role,
-                assigned_stage=stage,
-                phone=phone,
-                is_active=True
-            )
-            db.add(u)
-        await db.commit()
-        logger.info("[Repository] Seeded default IPS Domiciliaria user accounts.")
+
+        added_any = False
+        for uname, pwd, name, mail, role, stage, phone in homecare_users:
+            stmt = select(UserAccount).where(UserAccount.username == uname)
+            existing = (await db.execute(stmt)).scalar_one_or_none()
+            if not existing:
+                pwd_hash, salt = AuthService.hash_password(pwd)
+                u = UserAccount(
+                    username=uname,
+                    password_hash=pwd_hash,
+                    salt=salt,
+                    full_name=name,
+                    email=mail,
+                    role=role,
+                    assigned_stage=stage,
+                    phone=phone,
+                    is_active=True
+                )
+                db.add(u)
+                added_any = True
+
+        if added_any:
+            await db.commit()
+            logger.info("[Repository] Seeded HomeCare del Quindío I.P.S. user accounts.")
 
     @staticmethod
     async def resolve_case_problem(

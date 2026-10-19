@@ -862,6 +862,11 @@ async function loadFullConfig() {
         if (document.getElementById("cfg-sig-disclaimer")) document.getElementById("cfg-sig-disclaimer").value = cfg.signature_disclaimer || "";
         if (document.getElementById("cfg-signature")) document.getElementById("cfg-signature").value = cfg.reply_signature || "";
 
+        // AI Training Instructions (HomeCare del Quindío PADO)
+        if (document.getElementById("cfg-ai-training")) {
+            document.getElementById("cfg-ai-training").value = cfg.ai_training_instructions || "";
+        }
+
         // Trigger signature live preview
         updateSignatureLivePreview(false);
     } catch (e) {
@@ -1045,7 +1050,10 @@ async function saveFullConfig() {
         signature_registration: document.getElementById("cfg-sig-registration") ? document.getElementById("cfg-sig-registration").value.trim() : "",
         signature_phone: document.getElementById("cfg-sig-phone") ? document.getElementById("cfg-sig-phone").value.trim() : "",
         signature_disclaimer: document.getElementById("cfg-sig-disclaimer") ? document.getElementById("cfg-sig-disclaimer").value.trim() : "",
-        reply_signature: document.getElementById("cfg-signature").value.trim()
+        reply_signature: document.getElementById("cfg-signature").value.trim(),
+
+        // AI Training Instructions
+        ai_training_instructions: document.getElementById("cfg-ai-training") ? document.getElementById("cfg-ai-training").value.trim() : ""
     };
 
     if (!payload.imap_user || !payload.imap_password) {
@@ -1938,3 +1946,46 @@ window.updateSignatureLivePreview = updateSignatureLivePreview;
 window.buildAndSyncSignature = buildAndSyncSignature;
 window.insertSignatureIntoReply = insertSignatureIntoReply;
 
+// --- MANUAL OPERATIVO PADO & ENTRENAMIENTO IA HELPERS ---
+
+function openManualModal() {
+    const modal = document.getElementById("manual-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeManualModal() {
+    const modal = document.getElementById("manual-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function resetAiTrainingDefaults() {
+    if (!confirm("¿Desea restaurar las instrucciones de entrenamiento de IA a las oficiales de HomeCare del Quindío?")) return;
+    const defaultInstructions = `ENTRENAMIENTO ASISTENCIAL Y OPERATIVO IPS HOMECARE DEL QUINDÍO - FLUJO PADO AGUDO:
+1. DEPARTAMENTO ATENCIÓN AL USUARIO:
+   - carolina (Carolina Venencia): Recibe solicitud inicial, inicia ciclo y verifica requisitos. Tras la decisión del Dr. Federico Cortes, si es ACEPTADO o RECHAZADO, Carolina envía el correo formal al remitente.
+   - franchesca (Franchesca Triviño): Recibe tras aceptación médica. Contacta al paciente/cuidador, crea paciente en plataforma Medifolios y asigna en cuadros de aplicadores.
+   - yurli (Yurli): Monitorea la continuidad y salida del paciente en el módulo de hospitalización.
+
+2. DEPARTAMENTO INVENTARIOS:
+   - german (German Giraldo): Valida insumos y medicamentos contratados. Genera orden de compra a proveedores. Realiza alistamiento de insumos:
+     * Si tratamiento < 3 días: 1 catéter 22, 1 catéter 24, 2 tapones, 1 macrogotero, 1 jeringa por aplicación, 1 solución 100cc por aplicación, guantes por aplicación, isopañiles.
+     * Si tratamiento >= 3 días: Dotación multiplicada proporcionalmente por los días autorizados.
+     Entrega insumos al aplicador y liquida el reintegro de sobrantes al final.
+
+3. DEPARTAMENTO FACTURACIÓN:
+   - esteban (Esteban Gacha): Verifica copagos. Confirma estado de afiliación en EPS. Ingresa paciente al censo diario (Secretaría de Salud y EPS). Valida autorizaciones emitidas y factura el servicio ejecutado.
+
+4. DEPARTAMENTO ASISTENCIAL:
+   - hernando (Dr. Hernando Vence): Si el paciente proviene de 'Egreso de Clínica/Hospital' realiza valoración integral presencial. Si proviene de 'Ambulatorio' realiza valoración médica telefónica. Diligencia historia clínica de ingreso y consentimiento informado. Realiza visita médica de egreso.
+   - federico (Dr. Federico Cortes): Coordinación médica PADO. Verifica horarios del tratamiento. Si hay cobertura y disponibilidad técnica, ACEPTA el caso; de lo contrario RECHAZA con justificación clínica. Si hay extensiones autorizadas, gestiona el cobro de copago.`;
+
+    const el = document.getElementById("cfg-ai-training");
+    if (el) {
+        el.value = defaultInstructions;
+        alert("✅ Instrucciones de entrenamiento restablecidas. Recuerde hacer clic en 'Guardar Cambios' para aplicarlas.");
+    }
+}
+
+window.openManualModal = openManualModal;
+window.closeManualModal = closeManualModal;
+window.resetAiTrainingDefaults = resetAiTrainingDefaults;
