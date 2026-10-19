@@ -18,7 +18,56 @@ let currentToken = null;
 let currentResolveCaseId = null;
 let currentRejectCaseId = null;
 
+// Theme handling (Light / Dark / System)
+function setAppTheme(theme) {
+    if (!['light', 'dark', 'system'].includes(theme)) {
+        theme = 'system';
+    }
+    localStorage.setItem('app_theme', theme);
+    applyTheme(theme);
+}
+
+function applyTheme(theme) {
+    const isSystemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const effectiveTheme = theme === 'system' ? (isSystemDark ? 'dark' : 'light') : theme;
+
+    if (effectiveTheme === 'light') {
+        document.body.classList.add('theme-light');
+    } else {
+        document.body.classList.remove('theme-light');
+    }
+
+    // Update switcher buttons UI
+    const btnLight = document.getElementById('theme-btn-light');
+    const btnDark = document.getElementById('theme-btn-dark');
+    const btnSystem = document.getElementById('theme-btn-system');
+
+    if (btnLight) btnLight.classList.toggle('theme-btn-active', theme === 'light');
+    if (btnDark) btnDark.classList.toggle('theme-btn-active', theme === 'dark');
+    if (btnSystem) btnSystem.classList.toggle('theme-btn-active', theme === 'system');
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('app_theme') || 'system';
+    applyTheme(savedTheme);
+
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            const currentTheme = localStorage.getItem('app_theme') || 'system';
+            if (currentTheme === 'system') {
+                applyTheme('system');
+            }
+        });
+    }
+}
+
+// Run initial theme application
+if (typeof document !== 'undefined' && document.body) {
+    initTheme();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+    initTheme();
     if (initAuth()) {
         loadAllData();
     }
@@ -1509,4 +1558,6 @@ window.handleLoginSubmit = handleLoginSubmit;
 window.quickLogin = quickLogin;
 window.showLoginModal = showLoginModal;
 window.hideLoginModal = hideLoginModal;
+window.setAppTheme = setAppTheme;
+window.initTheme = initTheme;
 

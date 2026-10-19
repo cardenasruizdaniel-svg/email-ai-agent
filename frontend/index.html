@@ -14,7 +14,7 @@
             window.location.replace(window.location.pathname + '/' + window.location.search);
         }
     </script>
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="static/styles.css?v=2.8">
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
 
@@ -42,6 +42,22 @@
                 </button>
                 <button id="btn-mode-supervised" onclick="setMode('supervised')" class="px-2.5 py-1 text-xs rounded-md font-semibold transition-all">
                     👁️ Supervisado
+                </button>
+            </div>
+
+            <!-- Theme Mode Switcher (Claro / Oscuro / Sistema) -->
+            <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5 theme-switcher-box">
+                <button id="theme-btn-light" onclick="setAppTheme('light')" title="Aspecto Blanco / Claro" class="px-2 py-1 text-xs rounded-md transition-all text-slate-400 hover:text-white flex items-center space-x-1">
+                    <i class="fa-solid fa-sun text-amber-400"></i>
+                    <span class="hidden sm:inline">Claro</span>
+                </button>
+                <button id="theme-btn-dark" onclick="setAppTheme('dark')" title="Aspecto Oscuro" class="px-2 py-1 text-xs rounded-md transition-all text-slate-400 hover:text-white flex items-center space-x-1">
+                    <i class="fa-solid fa-moon text-indigo-400"></i>
+                    <span class="hidden sm:inline">Oscuro</span>
+                </button>
+                <button id="theme-btn-system" onclick="setAppTheme('system')" title="Tema Automático del Sistema" class="px-2 py-1 text-xs rounded-md transition-all text-slate-400 hover:text-white flex items-center space-x-1">
+                    <i class="fa-solid fa-desktop text-cyan-400"></i>
+                    <span class="hidden sm:inline">Auto</span>
                 </button>
             </div>
 
@@ -930,39 +946,13 @@
                 </button>
             </form>
 
-            <!-- Quick Access Test Buttons -->
-            <div class="pt-4 border-t border-slate-700/80">
-                <span class="text-[11px] font-bold text-slate-400 block mb-2 text-center uppercase tracking-wider">Acceso Rápido de Prueba (Demo)</span>
-                <div class="grid grid-cols-2 gap-2 text-[11px]">
-                    <button type="button" onclick="quickLogin('admin', 'admin123')" class="bg-slate-900/90 hover:bg-slate-700 border border-slate-700 text-slate-200 p-2 rounded-lg text-left flex items-center space-x-2 transition-colors">
-                        <i class="fa-solid fa-user-shield text-indigo-400"></i>
-                        <div>
-                            <div class="font-bold text-white">Coordinador</div>
-                            <div class="text-[9px] text-slate-400">admin / admin123</div>
-                        </div>
-                    </button>
-                    <button type="button" onclick="quickLogin('admisiones', 'adm123')" class="bg-slate-900/90 hover:bg-slate-700 border border-slate-700 text-slate-200 p-2 rounded-lg text-left flex items-center space-x-2 transition-colors">
-                        <i class="fa-solid fa-clipboard-check text-cyan-400"></i>
-                        <div>
-                            <div class="font-bold text-white">Admisiones</div>
-                            <div class="text-[9px] text-slate-400">admisiones / adm123</div>
-                        </div>
-                    </button>
-                    <button type="button" onclick="quickLogin('auditoria', 'aud123')" class="bg-slate-900/90 hover:bg-slate-700 border border-slate-700 text-slate-200 p-2 rounded-lg text-left flex items-center space-x-2 transition-colors">
-                        <i class="fa-solid fa-stethoscope text-emerald-400"></i>
-                        <div>
-                            <div class="font-bold text-white">Auditoría Médica</div>
-                            <div class="text-[9px] text-slate-400">auditoria / aud123</div>
-                        </div>
-                    </button>
-                    <button type="button" onclick="quickLogin('logistica', 'log123')" class="bg-slate-900/90 hover:bg-slate-700 border border-slate-700 text-slate-200 p-2 rounded-lg text-left flex items-center space-x-2 transition-colors">
-                        <i class="fa-solid fa-truck-medical text-amber-400"></i>
-                        <div>
-                            <div class="font-bold text-white">Logística & Rutas</div>
-                            <div class="text-[9px] text-slate-400">logistica / log123</div>
-                        </div>
-                    </button>
+            <!-- Institutional Security Note -->
+            <div class="pt-4 border-t border-slate-700/80 text-center space-y-1.5">
+                <div class="flex items-center justify-center space-x-1.5 text-xs text-slate-400">
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                    <span class="font-semibold text-slate-300">Acceso Seguro Cifrado • IPS Atención Domiciliaria</span>
                 </div>
+                <p class="text-[10px] text-slate-500">Ingrese con su usuario institucional y contraseña asignada.</p>
             </div>
         </div>
     </div>
@@ -1113,6 +1103,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="static/app.js?v=2.6"></script>
+    <script src="static/app.js?v=2.8"></script>
 </body>
 </html>

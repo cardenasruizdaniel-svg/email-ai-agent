@@ -1,3 +1,4 @@
+/* Custom Tab Styles */
 .tab-active {
     border-color: #6366f1;
     color: #818cf8;
@@ -10,7 +11,15 @@
     color: #cbd5e1;
 }
 
-/* Custom Scrollbar */
+/* Theme Switcher Active State */
+.theme-btn-active {
+    background-color: #6366f1 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Custom Scrollbar - Dark Default */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -24,4 +33,172 @@
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #475569;
+}
+
+/* ==========================================================================
+   LIGHT THEME (ASPECTO BLANCO / CLÍNICO INSTITUCIONAL)
+   ========================================================================== */
+body.theme-light {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+/* Scrollbar in Light Theme */
+body.theme-light ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+body.theme-light ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+}
+body.theme-light ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Header & Navigation in Light Theme */
+body.theme-light header {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+body.theme-light header h1 {
+    color: #0f172a !important;
+}
+body.theme-light header p {
+    color: #64748b !important;
+}
+
+/* Container Backgrounds (Cards, Tables, Modals) */
+body.theme-light .bg-slate-800 {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+}
+body.theme-light .bg-slate-800\/80 {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Inner Panels & Sub-boxes */
+body.theme-light .bg-slate-900 {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+body.theme-light .bg-slate-900\/60,
+body.theme-light .bg-slate-900\/80,
+body.theme-light .bg-slate-900\/90 {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* Typography Overrides */
+body.theme-light .text-white {
+    color: #0f172a !important;
+}
+body.theme-light .text-slate-100,
+body.theme-light .text-slate-200,
+body.theme-light .text-slate-300 {
+    color: #334155 !important;
+}
+body.theme-light .text-slate-400 {
+    color: #64748b !important;
+}
+body.theme-light .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+/* Borders */
+body.theme-light .border-slate-700,
+body.theme-light .border-slate-700\/40,
+body.theme-light .border-slate-700\/50,
+body.theme-light .border-slate-700\/60,
+body.theme-light .border-slate-700\/80 {
+    border-color: #e2e8f0 !important;
+}
+body.theme-light .divide-slate-700\/50 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #f1f5f9 !important;
+}
+
+/* Inputs, Selects & Textareas */
+body.theme-light input,
+body.theme-light select,
+body.theme-light textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+body.theme-light input:focus,
+body.theme-light select:focus,
+body.theme-light textarea:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+body.theme-light input::placeholder,
+body.theme-light textarea::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* Table Enhancements */
+body.theme-light thead {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+body.theme-light tr.hover\:bg-slate-700\/40:hover {
+    background-color: #f1f5f9 !important;
+}
+body.theme-light .tab-active {
+    border-color: #4f46e5;
+    color: #4f46e5;
+}
+body.theme-light .tab-inactive {
+    color: #64748b;
+}
+body.theme-light .tab-inactive:hover {
+    color: #0f172a;
+}
+
+/* Theme Switcher in Light Mode */
+body.theme-light .theme-switcher-box {
+    background-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+}
+body.theme-light .theme-switcher-box button {
+    color: #475569 !important;
+}
+body.theme-light .theme-switcher-box button:hover {
+    color: #0f172a !important;
+}
+body.theme-light .theme-btn-active {
+    background-color: #ffffff !important;
+    color: #4f46e5 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Modals in Light Mode */
+body.theme-light #login-modal,
+body.theme-light #user-modal,
+body.theme-light #resolve-modal,
+body.theme-light #quick-reject-modal,
+body.theme-light #case-modal {
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    backdrop-filter: blur(4px);
+}
+body.theme-light #login-modal > div,
+body.theme-light #user-modal > div,
+body.theme-light #resolve-modal > div,
+body.theme-light #quick-reject-modal > div,
+body.theme-light #case-modal > div {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Badges adjustments */
+body.theme-light #user-profile-badge {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
